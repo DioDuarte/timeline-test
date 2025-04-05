@@ -50,7 +50,6 @@ interface DateCoverage {
 }
 
 const Timeline: React.FC<TimelineProps> = ({ items }) => {
-    // Estados básicos
     const [itemsWithLanes, setItemsWithLanes] = useState<TimelineItemType[]>([]);
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -71,19 +70,59 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [editingLane, setEditingLane] = useState<number | null>(null);
     const [newLaneName, setNewLaneName] = useState('');
 
-    // Context
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter, minDate: contextMinDate, maxDate: contextMaxDate, setMinDate: setContextMinDate, setMaxDate: setContextMaxDate } = useTimelineConfig();
 
     // Calculate initial date range
     const dateRange = useMemo(() => getDateRange(items), [items]);
 
-    // IMPORTANTE: Mova a função getColumnWidth para antes do seu uso
-    // Função para calcular a largura das colunas
-    const getColumnWidth = useCallback(() => {
-        const minColumnWidth = 60;
-        const calculatedWidth = containerWidth / (Math.min(timelineDates.length, 30));
-        return Math.max(minColumnWidth, calculatedWidth);
-    }, [containerWidth, timelineDates.length]);
+    // Inicializa as datas visíveis
+    useEffect(() => {
+        if (!visibleMinDate || !visibleMaxDate) {
+            const { minDate, maxDate } = dateRange;
+
+            setVisibleMinDate(minDate);
+            setVisibleMaxDate(maxDate);
+            setInitialMinDate(minDate);
+            setInitialMaxDate(maxDate);
+            setContextMinDate(minDate);
+            setContextMaxDate(maxDate);
+
+            // Inicializa timeline dates
+            const initialDates = getTimelineDates(minDate, maxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
+            setTimelineDates(initialDates);
+        }
+    }, [dateRange, zoomLevel, paddingDaysBefore, paddingDaysAfter, setContextMinDate, setContextMaxDate, visibleMinDate, visibleMaxDate]);
+
+    // Update container width on resize
+    useEffect(() => {
+        const updateWidth = () => {
+            if (containerRef.current) {
+                const lanesColumnWidth = containerRef.current.querySelector('.lanes-column')?.clientWidth || 100;
+                const newWidth = containerRef.current.clientWidth - lanesColumnWidth;
+                setContainerWidth(newWidth);
+            }
+        };
+
+        window.addEventListener('resize', updateWidth);
+        updateWidth();
+
+        return () => window.removeEventListener('resize', updateWidth);
+    }, [timelineDates.length, zoomLevel, itemsWithLanes.length]);
+
+    // Assign lanes to items
+    useEffect(() => {
+        const newItemsWithLanes = assignLanes(items);
+        setItemsWithLanes(newItemsWithLanes);
+
+        const maxLaneFromItems = Math.max(...newItemsWithLanes.map(item => item.lane || 0), 0);
+        if (lanes.length === 0 && maxLaneFromItems >= 0) {
+            const initialLanes = Array.from({ length: maxLaneFromItems + 1 }, (_, i) => ({
+                id: i,
+                name: `Lane ${i + 1}`
+            }));
+            setLanes(initialLanes);
+        }
+    }, [items]);
 
     // Função para adicionar mais datas quando o cursor se aproxima das extremidades
     const extendTimelineDates = useCallback((direction: 'before' | 'after') => {
@@ -184,55 +223,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setContextMaxDate
     ]);
 
-    // Inicializa as datas visíveis
-    useEffect(() => {
-        if (!visibleMinDate || !visibleMaxDate) {
-            const { minDate, maxDate } = dateRange;
-
-            setVisibleMinDate(minDate);
-            setVisibleMaxDate(maxDate);
-            setInitialMinDate(minDate);
-            setInitialMaxDate(maxDate);
-            setContextMinDate(minDate);
-            setContextMaxDate(maxDate);
-
-            // Inicializa timeline dates
-            const initialDates = getTimelineDates(minDate, maxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
-            setTimelineDates(initialDates);
-        }
-    }, [dateRange, zoomLevel, paddingDaysBefore, paddingDaysAfter, setContextMinDate, setContextMaxDate, visibleMinDate, visibleMaxDate]);
-
-    // Update container width on resize
-    useEffect(() => {
-        const updateWidth = () => {
-            if (containerRef.current) {
-                const lanesColumnWidth = containerRef.current.querySelector('.lanes-column')?.clientWidth || 100;
-                const newWidth = containerRef.current.clientWidth - lanesColumnWidth;
-                setContainerWidth(newWidth);
-            }
-        };
-
-        window.addEventListener('resize', updateWidth);
-        updateWidth();
-
-        return () => window.removeEventListener('resize', updateWidth);
-    }, [timelineDates.length, zoomLevel, itemsWithLanes.length]);
-
-    // Assign lanes to items
-    useEffect(() => {
-        const newItemsWithLanes = assignLanes(items);
-        setItemsWithLanes(newItemsWithLanes);
-
-        const maxLaneFromItems = Math.max(...newItemsWithLanes.map(item => item.lane || 0), 0);
-        if (lanes.length === 0 && maxLaneFromItems >= 0) {
-            const initialLanes = Array.from({ length: maxLaneFromItems + 1 }, (_, i) => ({
-                id: i,
-                name: `Lane ${i + 1}`
-            }));
-            setLanes(initialLanes);
-        }
-    }, [items]);
-
     // Inicializa a posição do cursor
     useEffect(() => {
         if (initialCursorPosition === 0 && containerWidth > 0) {
@@ -328,6 +318,13 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         const prevDate = timelineDates[index - 1];
         return date.getMonth() !== prevDate.getMonth();
     };
+
+    // Função para calcular a largura das colunas
+    const getColumnWidth = useCallback(() => {
+        const minColumnWidth = 60;
+        const calculatedWidth = containerWidth / (Math.min(timelineDates.length, 30));
+        return Math.max(minColumnWidth, calculatedWidth);
+    }, [containerWidth, timelineDates.length]);
 
     const columnWidth = getColumnWidth();
     const totalGridWidth = columnWidth * timelineDates.length;
