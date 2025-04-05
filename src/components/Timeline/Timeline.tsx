@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
-import { differenceInCalendarDays, endOfWeek, format, parseISO, startOfDay, startOfWeek, addDays, subDays, isAfter, isBefore } from 'date-fns';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { differenceInCalendarDays, endOfWeek, format, parseISO, startOfDay, startOfWeek, addDays } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     TimelineContainer,
@@ -22,17 +22,14 @@ import {
     EditButton,
     SaveButton,
     CancelButton,
-    EmptyCell,
-    CursorNavigationControls,
-    CursorNavigationButton,
-    CursorIndicator
+    EmptyCell
 } from './styles';
 import { TimelineItem as TimelineItemType, ZoomLevel } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
 import { useTimelineConfig } from '../../context/TimelineContext';
 import { getDateRange, getTimelineDates } from '../../utils/dateUtils';
 import TimelineItem from '../TimelineItem/TimelineItem';
-import { DndContext, DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDroppable, DragEndEvent } from '@dnd-kit/core';
 
 interface TimelineProps {
     items: TimelineItemType[];
@@ -54,44 +51,16 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [containerWidth, setContainerWidth] = useState(0);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Estado para controle do cursor
-    const [cursorPosition, setCursorPosition] = useState<number>(0);
-    const [initialCursorPosition, setInitialCursorPosition] = useState<number>(0);
-
-    // Estado para controlar range de datas visível
-    const [visibleMinDate, setVisibleMinDate] = useState<Date | null>(null);
-    const [visibleMaxDate, setVisibleMaxDate] = useState<Date | null>(null);
-    const [timelineDates, setTimelineDates] = useState<Date[]>([]);
-    const [initialMinDate, setInitialMinDate] = useState<Date | null>(null);
-    const [initialMaxDate, setInitialMaxDate] = useState<Date | null>(null);
+    const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
     // Estado para gerenciar nomes das lanes
     const [lanes, setLanes] = useState<Lane[]>([]);
     const [editingLane, setEditingLane] = useState<number | null>(null);
     const [newLaneName, setNewLaneName] = useState('');
 
-    const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter, minDate: contextMinDate, maxDate: contextMaxDate, setMinDate: setContextMinDate, setMaxDate: setContextMaxDate } = useTimelineConfig();
-
-    // Calculate initial date range
-    const dateRange = useMemo(() => getDateRange(items), [items]);
-
-    // Inicializa as datas visíveis
-    useEffect(() => {
-        if (!visibleMinDate || !visibleMaxDate) {
-            const { minDate, maxDate } = dateRange;
-
-            setVisibleMinDate(minDate);
-            setVisibleMaxDate(maxDate);
-            setInitialMinDate(minDate);
-            setInitialMaxDate(maxDate);
-            setContextMinDate(minDate);
-            setContextMaxDate(maxDate);
-
-            // Inicializa timeline dates
-            const initialDates = getTimelineDates(minDate, maxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
-            setTimelineDates(initialDates);
-        }
-    }, [dateRange, zoomLevel, paddingDaysBefore, paddingDaysAfter, setContextMinDate, setContextMaxDate, visibleMinDate, visibleMaxDate]);
+    // Calculate date range and timeline dates
+    const { minDate, maxDate } = getDateRange(items);
+    const timelineDates = getTimelineDates(minDate, maxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
 
     // Update container width on resize
     useEffect(() => {
@@ -112,6 +81,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     // Assign lanes to items
     useEffect(() => {
         const newItemsWithLanes = assignLanes(items);
+        console.log('Items with lanes:', newItemsWithLanes);
         setItemsWithLanes(newItemsWithLanes);
 
         const maxLaneFromItems = Math.max(...newItemsWithLanes.map(item => item.lane || 0), 0);
@@ -124,120 +94,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         }
     }, [items]);
 
-    // Função para adicionar mais datas quando o cursor se aproxima das extremidades
-    const extendTimelineDates = useCallback((direction: 'before' | 'after') => {
-        if (!visibleMinDate || !visibleMaxDate) return;
-
-        const datesToAdd = 30; // Número de datas para adicionar em cada direção
-        let newDates: Date[] = [];
-
-        if (direction === 'before') {
-            // Adiciona datas antes do intervalo atual
-            const newMinDate = subDays(visibleMinDate, datesToAdd);
-            setVisibleMinDate(newMinDate);
-            setContextMinDate(newMinDate);
-
-            for (let i = datesToAdd; i > 0; i--) {
-                newDates.push(subDays(visibleMinDate, i));
-            }
-
-            setTimelineDates(prevDates => [...newDates, ...prevDates]);
-
-            // Ajusta a posição do cursor para manter a visualização consistente
-            setCursorPosition(prev => prev + datesToAdd * getColumnWidth());
-        } else {
-            // Adiciona datas após o intervalo atual
-            const newMaxDate = addDays(visibleMaxDate, datesToAdd);
-            setVisibleMaxDate(newMaxDate);
-            setContextMaxDate(newMaxDate);
-
-            for (let i = 1; i <= datesToAdd; i++) {
-                newDates.push(addDays(visibleMaxDate, i));
-            }
-
-            setTimelineDates(prevDates => [...prevDates, ...newDates]);
-        }
-    }, [visibleMinDate, visibleMaxDate, setContextMinDate, setContextMaxDate, getColumnWidth]);
-
-    // Função para mover o cursor
-    const moveCursor = useCallback((direction: 'left' | 'right' | 'reset') => {
-        if (direction === 'reset') {
-            // Volta o cursor para a posição inicial
-            setCursorPosition(initialCursorPosition);
-
-            if (initialMinDate && initialMaxDate) {
-                setVisibleMinDate(initialMinDate);
-                setVisibleMaxDate(initialMaxDate);
-                setContextMinDate(initialMinDate);
-                setContextMaxDate(initialMaxDate);
-
-                const initialDates = getTimelineDates(initialMinDate, initialMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
-                setTimelineDates(initialDates);
-            }
-
-            return;
-        }
-
-        // Calcula o movimento do cursor (50% da largura visível)
-        const moveAmount = containerWidth * 0.25;
-        const newPosition = direction === 'left'
-            ? cursorPosition - moveAmount
-            : cursorPosition + moveAmount;
-
-        setCursorPosition(newPosition);
-
-        // Calcula a posição relativa do cursor na timeline
-        const totalWidth = getColumnWidth() * timelineDates.length;
-        const cursorRelativePos = newPosition / totalWidth;
-
-        // Se o cursor estiver próximo das extremidades, estende a timeline
-        if (cursorRelativePos < 0.2) {
-            extendTimelineDates('before');
-        } else if (cursorRelativePos > 0.8) {
-            extendTimelineDates('after');
-        }
-
-        // Se o cursor não estiver visível, centralize-o
-        if (containerRef.current) {
-            const scrollContainer = containerRef.current;
-            const cursorPos = newPosition;
-
-            if (cursorPos < scrollContainer.scrollLeft ||
-                cursorPos > (scrollContainer.scrollLeft + scrollContainer.clientWidth)) {
-                scrollContainer.scrollLeft = cursorPos - (scrollContainer.clientWidth / 2);
-            }
-        }
-    }, [
-        cursorPosition,
-        initialCursorPosition,
-        initialMinDate,
-        initialMaxDate,
-        containerWidth,
-        timelineDates.length,
-        getColumnWidth,
-        extendTimelineDates,
-        zoomLevel,
-        paddingDaysBefore,
-        paddingDaysAfter,
-        setContextMinDate,
-        setContextMaxDate
-    ]);
-
-    // Inicializa a posição do cursor
-    useEffect(() => {
-        if (initialCursorPosition === 0 && containerWidth > 0) {
-            // Posiciona o cursor no centro da visualização inicialmente
-            const centerPosition = containerWidth / 2;
-            setCursorPosition(centerPosition);
-            setInitialCursorPosition(centerPosition);
-
-            // Scroll para centralizar o cursor
-            if (containerRef.current) {
-                containerRef.current.scrollLeft = centerPosition - (containerWidth / 2);
-            }
-        }
-    }, [containerWidth, initialCursorPosition]);
-
     // Handle zoom on scroll
     const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (e.altKey) {
@@ -249,12 +105,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             const newZoomLevel = zoomLevels[newIndex];
             if (newZoomLevel !== zoomLevel) {
                 setZoomLevel(newZoomLevel);
-
-                // Recalcular as datas da timeline com o novo nível de zoom
-                if (visibleMinDate && visibleMaxDate) {
-                    const newDates = getTimelineDates(visibleMinDate, visibleMaxDate, newZoomLevel, paddingDaysBefore, paddingDaysAfter);
-                    setTimelineDates(newDates);
-                }
             }
         }
     };
@@ -319,12 +169,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return date.getMonth() !== prevDate.getMonth();
     };
 
-    // Função para calcular a largura das colunas
-    const getColumnWidth = useCallback(() => {
+    const getColumnWidth = () => {
         const minColumnWidth = 60;
-        const calculatedWidth = containerWidth / (Math.min(timelineDates.length, 30));
+        const calculatedWidth = containerWidth / timelineDates.length;
         return Math.max(minColumnWidth, calculatedWidth);
-    }, [containerWidth, timelineDates.length]);
+    };
 
     const columnWidth = getColumnWidth();
     const totalGridWidth = columnWidth * timelineDates.length;
@@ -337,8 +186,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     };
 
     const dateCoverage = useMemo(() => {
-        if (!timelineDates.length) return {};
-
         const coverage: DateCoverage = {};
         for (let laneId = 0; laneId <= maxLane; laneId++) {
             coverage[laneId] = {};
@@ -346,7 +193,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 coverage[laneId][format(date, 'yyyy-MM-dd')] = false;
             });
         }
-
         itemsWithLanes.forEach(item => {
             const laneId = typeof item.lane === 'number' ? item.lane : 0;
             const startDate = parseISO(item.start);
@@ -410,32 +256,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         // A nova data de término mantém a mesma duração
         const newEndDate = addDays(newStartDate, duration);
 
-        // Verificar se as novas datas estão fora do intervalo visível
-        if (isBefore(newStartDate, visibleMinDate!) || isAfter(newEndDate, visibleMaxDate!)) {
-            let newMin = visibleMinDate!;
-            let newMax = visibleMaxDate!;
-
-            if (isBefore(newStartDate, visibleMinDate!)) {
-                newMin = subDays(newStartDate, paddingDaysBefore);
-            }
-
-            if (isAfter(newEndDate, visibleMaxDate!)) {
-                newMax = addDays(newEndDate, paddingDaysAfter);
-            }
-
-            // Expandir o intervalo visível se necessário
-            if (newMin !== visibleMinDate || newMax !== visibleMaxDate) {
-                setVisibleMinDate(newMin);
-                setVisibleMaxDate(newMax);
-                setContextMinDate(newMin);
-                setContextMaxDate(newMax);
-
-                // Recalcular datas da timeline
-                const newDates = getTimelineDates(newMin, newMax, zoomLevel, paddingDaysBefore, paddingDaysAfter);
-                setTimelineDates(newDates);
-            }
-        }
-
         // Formatar as datas no formato ISO
         const formattedStartDate = format(newStartDate, 'yyyy-MM-dd');
         const formattedEndDate = format(newEndDate, 'yyyy-MM-dd');
@@ -453,6 +273,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         );
 
         setItemsWithLanes(assignLanes(updatedItems));
+        console.log('Item reposicionado:', updatedItem);
     };
 
     return (
@@ -467,24 +288,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
                     Mês
                 </ZoomButton>
-
-                <CursorNavigationControls>
-                    <CursorNavigationButton onClick={() => moveCursor('left')}>
-                        ← Mover para trás
-                    </CursorNavigationButton>
-                    <CursorNavigationButton onClick={() => moveCursor('reset')}>
-                        ↺ Resetar
-                    </CursorNavigationButton>
-                    <CursorNavigationButton onClick={() => moveCursor('right')}>
-                        Mover para frente →
-                    </CursorNavigationButton>
-                </CursorNavigationControls>
             </TimelineControls>
 
-            <ScrollContainer
-                ref={containerRef}
-                onWheel={handleWheel}
-            >
+            <ScrollContainer ref={containerRef} onWheel={handleWheel}>
                 <TimelineHeader>
                     <HeaderLabel>Data</HeaderLabel>
                     <DateHeaderContainer style={{ width: `${totalGridWidth}px` }}>
@@ -506,7 +312,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         <div className="date-row">
                             {timelineDates.map((date, index) => (
                                 <DateHeaderCell
-                                    key={`date-header-${index}-${format(date, 'yyyy-MM-dd')}`}
+                                    key={index}
                                     style={{
                                         width: `${columnWidth}px`,
                                         minWidth: `${columnWidth}px`,
@@ -562,23 +368,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     </LanesColumn>
 
                     <DndContext onDragEnd={handleDragEnd}>
-                        <TimelineGrid
-                            style={{
-                                width: `${totalGridWidth}px`,
-                                height: `${totalGridHeight}px`,
-                                position: 'relative'
-                            }}
-                        >
-                            {/* Indicador de Cursor */}
-                            <CursorIndicator
-                                style={{
-                                    left: `${cursorPosition}px`,
-                                    height: `${totalGridHeight}px`,
-                                }}
-                            />
-
+                        <TimelineGrid style={{ width: `${totalGridWidth}px`, height: `${totalGridHeight}px`, position: 'relative' }}>
                             {activeLanes.map((laneId) => (
-                                <div key={laneId}>
+                                <div
+                                    key={laneId}
+                                >
                                     {itemsWithLanes
                                         .filter(item => item.lane === laneId)
                                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
@@ -587,8 +381,8 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                                 key={item.id}
                                                 item={item}
                                                 items={itemsWithLanes}
-                                                minDate={visibleMinDate || dateRange.minDate}
-                                                maxDate={visibleMaxDate || dateRange.maxDate}
+                                                minDate={minDate}
+                                                maxDate={maxDate}
                                                 totalWidth={totalGridWidth}
                                                 maxLanes={activeLanes.length}
                                                 columnWidth={columnWidth}
@@ -597,12 +391,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                         ))}
                                 </div>
                             ))}
-
                             {activeLanes.map((laneId) =>
                                 timelineDates.map((date, dateIndex) => (
                                     !dateCoverage[laneId]?.[format(date, 'yyyy-MM-dd')] && (
                                         <EmptyCell
-                                            key={`empty-${laneId}-${dateIndex}-${format(date, 'yyyy-MM-dd')}`}
+                                            key={`empty-${laneId}-${dateIndex}`}
                                             style={{
                                                 top: `${laneId * 60}px`,
                                                 left: `${dateIndex * columnWidth}px`,
@@ -613,10 +406,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                     )
                                 ))
                             )}
-
                             {timelineDates.map((date, index) => (
                                 <VerticalGridLine
-                                    key={`vgrid-${index}-${format(date, 'yyyy-MM-dd')}`}
+                                    key={index}
                                     style={{
                                         left: `${index * columnWidth}px`,
                                         height: `${totalGridHeight}px`
@@ -625,7 +417,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                     isMonthStart={date.getDate() === 1}
                                 />
                             ))}
-
                             {activeLanes.slice(0, -1).map((laneId, index) => (
                                 <HorizontalGridLine
                                     key={`hgrid-${laneId}`}
@@ -640,13 +431,12 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             <Instructions>
                 <p><strong>Instruções:</strong></p>
                 <ul>
-                    <li>Use os botões de navegação para mover o cursor pela linha do tempo</li>
-                    <li>Quando o cursor se aproxima das extremidades, mais datas são adicionadas</li>
-                    <li>Clique em "Resetar" para voltar à posição inicial</li>
                     <li>Arraste itens horizontalmente para reposicioná-los no tempo</li>
+                    <li>Redimensione itens arrastando as bordas esquerdas ou direitas</li>
                     <li>Clique duplo para editar nomes de itens</li>
-                    <li>Use os botões de zoom para mudar a visualização</li>
+                    <li>Use os botões de zoom ou role o mouse com Alt pressionado para mudar a visualização</li>
                     <li>Clique no ícone de edição para renomear uma lane</li>
+                    <li>Áreas em cinza claro indicam dias sem itens programados</li>
                 </ul>
             </Instructions>
         </TimelineContainer>
