@@ -5,7 +5,6 @@ import {
     endOfMonth, endOfWeek,
     format,
     isValid,
-    isWithinInterval,
     parse,
     startOfMonth, startOfWeek
 } from 'date-fns';
@@ -140,10 +139,11 @@ export function calculateItemPosition(
 ): {
     left: number;
     width: number;
-    top: number;
     height: number;
+    top: number;
+
 } {
-    // Ajustar gridStartDate para alinhar com o início do período do zoom
+    // Determinar a data de início do grid com base no zoom
     let gridStartDate: Date;
     switch (zoomLevel) {
         case 'day':
@@ -157,68 +157,77 @@ export function calculateItemPosition(
             break;
     }
 
-    const startDiffDays = differenceInDays(startDate, gridStartDate);
-    const endDiffDays = differenceInDays(endDate, gridStartDate);
-    const itemDurationDays = endDiffDays - startDiffDays + 1;
-
     let left: number;
     let width: number;
-    const marginSpace = columnWidth * 0.05; // 5% da largura da coluna como espaço
+    const marginSpace = columnWidth * 0.05; // 5% da largura da coluna como margem
 
     switch (zoomLevel) {
-        case 'day':
-            left = startDiffDays * columnWidth;
-            width = (itemDurationDays * columnWidth) - marginSpace;
+        case 'day': {
+            const startDiffDays = differenceInDays(startDate, gridStartDate);
+            const endDiffDays = differenceInDays(endDate, gridStartDate);
+            const itemDurationDays = endDiffDays - startDiffDays + 1;
+
+            left = startDiffDays * columnWidth + marginSpace;
+            width = itemDurationDays * columnWidth - marginSpace;
+
+            console.log({
+                item: `${startDate.toISOString().slice(0,10)} to ${endDate.toISOString().slice(0,10)}`,
+                startDiffDays,
+                endDiffDays,
+                itemDurationDays,
+                columnWidth,
+                width
+            });
             break;
+        }
         case 'week': {
             const daysPerColumn = 7;
+            const startDiffDays = differenceInDays(startDate, gridStartDate);
+            const endDiffDays = differenceInDays(endDate, gridStartDate);
+            const itemDurationDays = endDiffDays - startDiffDays + 1;
+
             const columnStartIndex = Math.floor(startDiffDays / daysPerColumn);
             const daysFromColumnStart = startDiffDays % daysPerColumn;
+
             left = (columnStartIndex * columnWidth) + (daysFromColumnStart / daysPerColumn) * columnWidth;
             width = (itemDurationDays / daysPerColumn) * columnWidth - marginSpace;
             break;
         }
         case 'month': {
-            const gridStartDate = startOfMonth(addDays(minDate, -paddingDaysBefore));
-            let currentMonthStart = startOfMonth(startDate);
-            const itemEnd = endDate > maxDate ? maxDate : endDate;
-            let totalWidth = 0;
-            let calculatedLeft = 0;
-            let isFirstMonth = true;
+            const gridStartMonth = startOfMonth(gridStartDate); // Início do grid alinhado ao mês
+            const startMonth = startOfMonth(startDate); // Início do mês do startDate
+            const endMonth = endOfMonth(endDate); // Fim do mês do endDate
 
-            while (currentMonthStart <= endOfMonth(itemEnd)) {
-                const monthStart = currentMonthStart;
+            // Calcular a diferença em meses entre o grid e o início do item
+            const startMonthDiff = differenceInMonths(startMonth, gridStartMonth);
+
+            // Calcular a proporção de dias no primeiro mês
+            const totalDaysInStartMonth = differenceInDays(endOfMonth(startDate), startOfMonth(startDate)) + 1;
+            const daysFromStartOfMonth = differenceInDays(startDate, startOfMonth(startDate));
+            const startProportion = daysFromStartOfMonth / totalDaysInStartMonth;
+
+            // Posição inicial: início do mês + proporção dentro do primeiro mês
+            left = (startMonthDiff * columnWidth) + (startProportion * columnWidth);
+
+            // Calcular a largura total proporcional aos meses abrangidos
+            let totalWidth = 0;
+            let currentMonth = startMonth;
+            while (currentMonth <= endMonth) {
+                const monthStart = currentMonth;
                 const monthEnd = endOfMonth(monthStart);
                 const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
 
-                const itemInMonth = isWithinInterval(startDate, { start: monthStart, end: monthEnd }) ||
-                    isWithinInterval(endDate, { start: monthStart, end: monthEnd }) ||
-                    (startDate < monthStart && endDate > monthEnd);
+                // Determinar os dias do item dentro deste mês
+                const itemStartInMonth = startDate > monthStart ? startDate : monthStart;
+                const itemEndInMonth = endDate < monthEnd ? endDate : monthEnd;
+                const daysInThisMonth = differenceInDays(itemEndInMonth, itemStartInMonth) + 1;
 
-                if (itemInMonth) {
-                    // Calcular o número de meses entre gridStartDate e monthStart
-                    const monthDiff = differenceInMonths(monthStart, gridStartDate);
-                    const columnIndex = monthDiff; // Cada coluna é um mês
+                const monthProportion = daysInThisMonth / daysInMonth;
+                totalWidth += monthProportion * columnWidth;
 
-                    const itemStartInMonth = startDate > monthStart ? startDate : monthStart;
-                    const itemEndInMonth = endDate < monthEnd ? endDate : monthEnd;
-                    const daysInThisMonth = differenceInDays(itemEndInMonth, itemStartInMonth) + 1;
-
-                    const monthProportion = daysInThisMonth / daysInMonth;
-
-                    if (isFirstMonth) {
-                        const daysFromMonthStart = differenceInDays(startDate, monthStart);
-                        calculatedLeft = (columnIndex * columnWidth) + (daysFromMonthStart / daysInMonth) * columnWidth;
-                        isFirstMonth = false;
-                    }
-
-                    totalWidth += monthProportion * columnWidth;
-                }
-
-                currentMonthStart = addMonths(currentMonthStart, 1);
+                currentMonth = addMonths(currentMonth, 1);
             }
 
-            left = calculatedLeft;
             width = totalWidth - marginSpace;
             break;
         }
@@ -229,7 +238,7 @@ export function calculateItemPosition(
     return {
         left,
         width: Math.max(width, 20),
-        top: top + 5,
+        top: top + 5 ,
         height: itemHeight
     };
 }

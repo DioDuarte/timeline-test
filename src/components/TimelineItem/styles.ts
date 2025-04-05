@@ -32,32 +32,86 @@ export const ItemContainer = styled.div`
     padding: 4px 8px;
     color: white;
     font-size: 12px;
-    cursor: pointer;
+    cursor: grab;
     box-sizing: border-box;
-    transition: all 0.3s ease; // Transição suave para todas as propriedades animáveis
     z-index: 10;
-    min-width: 40px; // Largura mínima inicial para evitar que fique muito pequeno
+    min-width: 40px;
+    width: auto;
+    height: 50px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    white-space: nowrap;
+    /* Alinhamento padrão à esquerda quando compacto */
+    justify-content: flex-start;
 
-    &:hover {
-        min-width: 200px; // Largura mínima no hover
-        background: #357abd; // Fundo mais escuro
-        z-index: 20; // Fica acima de outros itens
-        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2); // Sombra sutil
-        white-space: normal; // Permite quebra de linha
-        overflow: visible; // Garante que o texto expandido seja visível
+    /* Aplicando transições por padrão */
+    transition: min-width 0.2s ease-out,
+    background-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.15s ease;
+
+    /* Centraliza quando tem espaço suficiente */
+    &[data-has-space="true"] {
+        justify-content: center;
+    }
+
+    /* Comportamento de hover quando não está arrastando */
+    &:hover:not([data-dragging="true"]) {
+        min-width: 200px;
+        background: #357abd;
+        z-index: 20;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        transform: translateY(-2px);
+        justify-content: center;
+    }
+
+    &[data-dragging="true"],
+    &:active {
+        cursor: grabbing;
+        min-width: 40px;
+        background: #4a90e2;
+        white-space: nowrap;
+        overflow: hidden;
+        box-shadow: none;
+        transform: translateY(0);
+        transition: none;
+        justify-content: flex-start;
     }
 `;
 
 export const ItemContent = styled.div`
     display: flex;
     flex-direction: column;
+    width: 100%;
     overflow: hidden;
     text-overflow: ellipsis;
-    white-space: nowrap; // Normalmente truncado
+    white-space: nowrap;
+    transition: all 0.2s ease;
+    /* Alinhamento padrão à esquerda */
+    align-items: flex-start;
+    text-align: left;
 
-    ${ItemContainer}:hover & {
-        white-space: normal; // No hover, permite texto completo
+    /* Centraliza quando tem espaço suficiente */
+    ${ItemContainer}[data-has-space="true"] & {
+        align-items: center;
+        text-align: center;
+    }
+
+    ${ItemContainer}:hover:not([data-dragging="true"]) & {
+        white-space: normal;
         overflow: visible;
+        align-items: center;
+        text-align: center;
+    }
+
+    ${ItemContainer}[data-dragging="true"] &,
+    ${ItemContainer}:active & {
+        white-space: nowrap;
+        overflow: hidden;
+        align-items: flex-start;
+        text-align: left;
+        transition: none;
     }
 `;
 

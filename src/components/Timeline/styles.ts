@@ -5,7 +5,9 @@ export const TimelineContainer = styled.div`
   display: flex;
   flex-direction: column;
   width: 100%;
+  max-width: 100%;
   overflow: hidden;
+  box-sizing: border-box;
 `;
 
 export const TimelineControls = styled.div`
@@ -36,6 +38,9 @@ export const ScrollContainer = styled.div`
   background-color: white;
   display: flex;
   flex-direction: column;
+  width: 100%; // Ocupa toda a largura disponível
+  max-width: 100%; // Evita ultrapassar o contêiner pai
+  box-sizing: border-box;
 
   &::-webkit-scrollbar {
     height: 10px;
@@ -131,6 +136,7 @@ export const LanesColumn = styled.div`
   min-width: 100px;
   padding: 10px;
   border-right: 1px solid #e0e0e0;
+  height: 60px;
   display: flex;
   flex-direction: column;
   flex: 0 0 auto;
@@ -152,7 +158,7 @@ export const TimelineGrid = styled.div`
   position: relative;
   flex: 1;
   background: linear-gradient(to bottom, #ffffff, #fafafa);
-  min-height: 300px;
+  //min-height: 300px;
 `;
 
 export const VerticalGridLine = styled.div<{
@@ -247,4 +253,52 @@ export const EmptyCell = styled.div`
   position: absolute;
   background-color: #f5f5f5;
   z-index: 1;
+`;
+
+// Adicione estes componentes ao arquivo styles.ts
+
+export const CursorNavigationControls = styled.div`
+    display: flex;
+    margin-left: 20px;
+    gap: 10px;
+`;
+
+export const CursorNavigationButton = styled.button`
+    background: #2c3e50;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 8px 12px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.2s;
+    
+    &:hover {
+        background: #34495e;
+    }
+    
+    &:active {
+        background: #1a2530;
+    }
+`;
+
+export const CursorIndicator = styled.div`
+    position: absolute;
+    width: 2px;
+    background: rgba(255, 0, 0, 0.7);
+    z-index: 15;
+    top: 0;
+    pointer-events: none;
+    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+    
+    &::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -4px;
+        width: 10px;
+        height: 10px;
+        background: red;
+        border-radius: 50%;
+    }
 `;
