@@ -38,25 +38,14 @@ export const ScrollContainer = styled.div`
   background-color: white;
   display: flex;
   flex-direction: column;
-  width: 100%; // Ocupa toda a largura disponível
-  max-width: 100%; // Evita ultrapassar o contêiner pai
+  width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
 
+  -ms-overflow-style: none;
+  scrollbar-width: none;
   &::-webkit-scrollbar {
-    height: 10px;
-  }
-
-  &::-webkit-scrollbar-track {
-    background: #f1f1f1;
-  }
-
-  &::-webkit-scrollbar-thumb {
-    background: #c1c1c1;
-    border-radius: 5px;
-  }
-
-  &::-webkit-scrollbar-thumb:hover {
-    background: #a8a8a8;
+    display: none;
   }
 `;
 

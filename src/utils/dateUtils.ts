@@ -194,27 +194,25 @@ export function calculateItemPosition(
             break;
         }
         case 'month': {
-            const gridStartMonth = startOfMonth(gridStartDate); // Início do grid alinhado ao mês
-            const startMonth = startOfMonth(startDate); // Início do mês do startDate
-            const endMonth = endOfMonth(endDate); // Fim do mês do endDate
+            const gridStartMonth = startOfMonth(gridStartDate);
+            const startMonth = startOfMonth(startDate);
+            const endMonth = startOfMonth(endDate); // Usar o início do mês de endDate para o loop
 
-            // Calcular a diferença em meses entre o grid e o início do item
+            // Calcular a diferença em meses para a posição inicial
             const startMonthDiff = differenceInMonths(startMonth, gridStartMonth);
-
-            // Calcular a proporção de dias no primeiro mês
             const totalDaysInStartMonth = differenceInDays(endOfMonth(startDate), startOfMonth(startDate)) + 1;
             const daysFromStartOfMonth = differenceInDays(startDate, startOfMonth(startDate));
             const startProportion = daysFromStartOfMonth / totalDaysInStartMonth;
 
-            // Posição inicial: início do mês + proporção dentro do primeiro mês
             left = (startMonthDiff * columnWidth) + (startProportion * columnWidth);
 
-            // Calcular a largura total proporcional aos meses abrangidos
             let totalWidth = 0;
             let currentMonth = startMonth;
+
+            // Ajustar o loop para incluir o mês de endDate
             while (currentMonth <= endMonth) {
                 const monthStart = currentMonth;
-                const monthEnd = endOfMonth(monthStart);
+                const monthEnd = endOfMonth(currentMonth);
                 const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
 
                 // Determinar os dias do item dentro deste mês
@@ -228,7 +226,7 @@ export function calculateItemPosition(
                 currentMonth = addMonths(currentMonth, 1);
             }
 
-            width = totalWidth - marginSpace;
+            width = totalWidth; // Remover marginSpace para teste inicial
             break;
         }
     }

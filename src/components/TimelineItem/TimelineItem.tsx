@@ -27,24 +27,20 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                                                        maxLanes,
                                                        onItemChange
                                                    }) => {
-    // Estados
     const [isEditing, setIsEditing] = useState(false);
     const [editValue, setEditValue] = useState(item.name);
     const [isDragging, setIsDragging] = useState(false);
     const [hasEnoughSpace, setHasEnoughSpace] = useState(false);
     const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
 
-    // Refs
     const contentRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
-    // Contexto e dados
     const { zoomLevel, paddingDaysBefore } = useTimelineConfig();
     const startDate = parseISO(item.start);
     const endDate = parseISO(item.end);
     const laneIndex = typeof item.lane === 'number' ? item.lane : 0;
 
-    // Cálculo da posição
     const { left, width, top, height } = calculateItemPosition(
         startDate,
         endDate,
@@ -56,13 +52,11 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         zoomLevel
     );
 
-    // Configuração de arrastar
     const { attributes, listeners, setNodeRef, transform } = useDraggable({
         id: item.id,
         data: { item },
     });
 
-    // Verificação de espaço para texto
     useEffect(() => {
         const checkTextFit = () => {
             if (contentRef.current && containerRef.current) {
@@ -77,15 +71,18 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         return () => window.removeEventListener('resize', checkTextFit);
     }, [item.name, width]);
 
-    // Atualiza posição de arrastar
     useEffect(() => {
-        setDragPosition({
-            x: transform ? transform.x : 0,
-            y: 0
-        });
-    }, [transform]);
+        if (transform) {
+            const newX = transform.x;
+            const minX = -left;
+            const maxX = totalWidth - (left + width);
+            const clampedX = Math.max(minX, Math.min(newX, maxX));
+            setDragPosition({ x: clampedX, y: 0 });
+        } else {
+            setDragPosition({ x: 0, y: 0 });
+        }
+    }, [transform, left, width, totalWidth]);
 
-    // Funções de manipulação
     const handleDragStart = () => setIsDragging(true);
     const handleDragEnd = () => setIsDragging(false);
     const handleDoubleClick = () => setIsEditing(true);
@@ -112,7 +109,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         }
     };
 
-    // Mescla refs para uso com dnd-kit e nosso containerRef
     const mergeRefs = (...refs: any[]) => (value: any) => {
         refs.forEach(ref => {
             if (typeof ref === 'function') ref(value);
@@ -120,7 +116,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         });
     };
 
-    // Estilo do item
     const style: CSSProperties = {
         position: 'absolute',
         left: `${left}px`,
@@ -131,7 +126,6 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         cursor: 'ew-resize',
     };
 
-    // Renderização condicional para modo de edição ou exibição
     const renderContent = () => {
         if (isEditing) {
             return (

@@ -1,5 +1,18 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { differenceInCalendarDays, endOfWeek, format, parseISO, startOfDay, startOfWeek, addDays } from 'date-fns';
+import React, { useState, useEffect, useRef } from 'react';
+import {
+    differenceInCalendarDays,
+    format,
+    parseISO,
+    startOfDay,
+    addDays,
+    addWeeks,
+    addMonths,
+    startOfWeek,
+    endOfWeek,
+    subDays,
+    subWeeks,
+    subMonths
+} from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
     TimelineContainer,
@@ -7,21 +20,13 @@ import {
     ZoomButton,
     ScrollContainer,
     TimelineHeader,
-    HeaderLabel,
     DateHeaderContainer,
     DateHeaderCell,
     TimelineBody,
-    LanesColumn,
-    LaneLabel,
     TimelineGrid,
     VerticalGridLine,
     HorizontalGridLine,
     Instructions,
-    LaneNameInput,
-    LaneActions,
-    EditButton,
-    SaveButton,
-    CancelButton,
     EmptyCell
 } from './styles';
 import { TimelineItem as TimelineItemType, ZoomLevel } from '../../types/types';
@@ -29,46 +34,66 @@ import { assignLanes } from '../../utils/assignLanes';
 import { useTimelineConfig } from '../../context/TimelineContext';
 import { getDateRange, getTimelineDates } from '../../utils/dateUtils';
 import TimelineItem from '../TimelineItem/TimelineItem';
-import { DndContext, useDroppable, DragEndEvent } from '@dnd-kit/core';
+import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
+import { DndContext, DragEndEvent } from '@dnd-kit/core';
 
 interface TimelineProps {
     items: TimelineItemType[];
 }
 
-interface Lane {
-    id: number;
-    name: string;
-}
-
-interface DateCoverage {
-    [laneId: number]: {
-        [dateStr: string]: boolean;
-    };
-}
-
 const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [itemsWithLanes, setItemsWithLanes] = useState<TimelineItemType[]>([]);
     const [containerWidth, setContainerWidth] = useState(0);
+    const [dynamicMinDate, setDynamicMinDate] = useState<Date | null>(null);
+    const [dynamicMaxDate, setDynamicMaxDate] = useState<Date | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+
+    const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
+    const [startX, setStartX] = useState(0);
+    const [scrollLeftStart, setScrollLeftStart] = useState(0);
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
-    // Estado para gerenciar nomes das lanes
-    const [lanes, setLanes] = useState<Lane[]>([]);
-    const [editingLane, setEditingLane] = useState<number | null>(null);
-    const [newLaneName, setNewLaneName] = useState('');
+    // Obter os limites iniciais dos itens e adicionar padding extra baseado no zoom
+    const { minDate: initialMinDate, maxDate: initialMaxDate } = getDateRange(items);
 
-    // Calculate date range and timeline dates
-    const { minDate, maxDate } = getDateRange(items);
-    const timelineDates = getTimelineDates(minDate, maxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
+    // Ajustar os limites iniciais com base no zoomLevel
+    const adjustInitialDates = (minDate: Date, maxDate: Date, zoom: ZoomLevel) => {
+        let adjustedMinDate: Date;
+        let adjustedMaxDate: Date;
 
-    // Update container width on resize
+        switch (zoom) {
+            case 'day':
+                adjustedMinDate = subDays(minDate, 30); // 30 dias antes
+                adjustedMaxDate = addDays(maxDate, 30); // 30 dias depois
+                break;
+            case 'week':
+                adjustedMinDate = subWeeks(minDate, 20); // 20 semanas antes
+                adjustedMaxDate = addWeeks(maxDate, 20); // 20 semanas depois
+                break;
+            case 'month':
+                adjustedMinDate = subMonths(minDate, 12); // 12 meses antes
+                adjustedMaxDate = addMonths(maxDate, 12); // 12 meses depois
+                break;
+            default:
+                adjustedMinDate = minDate;
+                adjustedMaxDate = maxDate;
+        }
+
+        return { adjustedMinDate, adjustedMaxDate };
+    };
+
+    const { adjustedMinDate, adjustedMaxDate } = adjustInitialDates(initialMinDate, initialMaxDate, zoomLevel);
+
+    // Usar os limites ajustados ou os dinâmicos (se houver expansão)
+    const currentMinDate = dynamicMinDate || adjustedMinDate;
+    const currentMaxDate = dynamicMaxDate || adjustedMaxDate;
+    const timelineDates = getTimelineDates(currentMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
+
     useEffect(() => {
         const updateWidth = () => {
             if (containerRef.current) {
-                const lanesColumnWidth = containerRef.current.querySelector('.lanes-column')?.clientWidth || 100;
-                const newWidth = containerRef.current.clientWidth - lanesColumnWidth;
-                setContainerWidth(newWidth);
+                setContainerWidth(containerRef.current.clientWidth);
             }
         };
 
@@ -78,23 +103,49 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return () => window.removeEventListener('resize', updateWidth);
     }, [timelineDates.length, zoomLevel, itemsWithLanes.length]);
 
-    // Assign lanes to items
+    const expandMinDate = (currentMin: Date) => {
+        switch (zoomLevel) {
+            case 'day': return subDays(currentMin, 7);
+            case 'week': return subWeeks(currentMin, 2);
+            case 'month': return subMonths(currentMin, 1);
+            default: return currentMin;
+        }
+    };
+
+    const expandMaxDate = (currentMax: Date) => {
+        switch (zoomLevel) {
+            case 'day': return addDays(currentMax, 7);
+            case 'week': return addWeeks(currentMax, 2);
+            case 'month': return addMonths(currentMax, 1);
+            default: return currentMax;
+        }
+    };
+
     useEffect(() => {
         const newItemsWithLanes = assignLanes(items);
-        console.log('Items with lanes:', newItemsWithLanes);
         setItemsWithLanes(newItemsWithLanes);
 
-        const maxLaneFromItems = Math.max(...newItemsWithLanes.map(item => item.lane || 0), 0);
-        if (lanes.length === 0 && maxLaneFromItems >= 0) {
-            const initialLanes = Array.from({ length: maxLaneFromItems + 1 }, (_, i) => ({
-                id: i,
-                name: `Lane ${i + 1}`
-            }));
-            setLanes(initialLanes);
-        }
-    }, [items]);
+        const firstDate = timelineDates[0];
+        const lastDate = timelineDates[timelineDates.length - 1];
 
-    // Handle zoom on scroll
+        const itemsAtStart = newItemsWithLanes.some(item => {
+            const startDate = parseISO(item.start);
+            return startDate < firstDate;
+        });
+
+        const itemsAtEnd = newItemsWithLanes.some(item => {
+            const endDate = parseISO(item.end);
+            return endDate > lastDate;
+        });
+
+        if (itemsAtStart && !dynamicMinDate) {
+            setDynamicMinDate(expandMinDate(initialMinDate));
+        }
+        if (itemsAtEnd && !dynamicMaxDate) {
+            setDynamicMaxDate(expandMaxDate(initialMaxDate));
+        }
+    }, [items, timelineDates]);
+
     const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (e.altKey) {
             e.preventDefault();
@@ -102,16 +153,13 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             const currentIndex = zoomLevels.indexOf(zoomLevel);
             let newIndex = currentIndex + (e.deltaY > 0 ? 1 : -1);
             newIndex = Math.max(0, Math.min(newIndex, zoomLevels.length - 1));
-            const newZoomLevel = zoomLevels[newIndex];
-            if (newZoomLevel !== zoomLevel) {
-                setZoomLevel(newZoomLevel);
-            }
+            setZoomLevel(zoomLevels[newIndex]);
+            setDynamicMinDate(null);
+            setDynamicMaxDate(null);
         }
     };
 
-    // Handle item changes
     const handleItemChange = (updatedItems: TimelineItemType[]) => {
-        // Se updatedItems contém apenas um item, mesclar com a lista existente
         if (updatedItems.length === 1) {
             const updatedItem = updatedItems[0];
             const newItemsWithLanes = itemsWithLanes.map(i =>
@@ -119,44 +167,19 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             );
             setItemsWithLanes(assignLanes(newItemsWithLanes));
         } else {
-            // Caso receba a lista completa
-            const newItemsWithLanes = assignLanes(updatedItems);
-            setItemsWithLanes(newItemsWithLanes);
+            setItemsWithLanes(assignLanes(updatedItems));
         }
     };
 
-    // Funções de edição de lane
-    const handleEditLane = (laneId: number) => {
-        setEditingLane(laneId);
-        const lane = lanes.find(l => l.id === laneId);
-        if (lane) {
-            setNewLaneName(lane.name);
-        }
-    };
-
-    const handleSaveLaneName = (laneId: number) => {
-        setLanes(lanes.map(lane =>
-            lane.id === laneId ? { ...lane, name: newLaneName } : lane
-        ));
-        setEditingLane(null);
-    };
-
-    const handleCancelEdit = () => {
-        setEditingLane(null);
-    };
-
-    const maxLaneFromItems = Math.max(...itemsWithLanes.map(item => item.lane || 0), 0);
-    const maxLane = maxLaneFromItems;
+    const maxLane = Math.max(...itemsWithLanes.map(item => item.lane || 0), 0);
+    const activeLanes = Array.from({ length: maxLane + 1 }, (_, i) => i);
 
     const formatHeaderDate = (date: Date) => {
         switch (zoomLevel) {
             case 'day':
                 return format(date, 'd');
-            case 'week': {
-                const weekStart = startOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
-                const weekEnd = endOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
-                return `${format(weekStart, 'dd/MM')} - ${format(weekEnd, 'dd/MM')}`;
-            }
+            case 'week':
+                return `${format(startOfWeek(date, { locale: ptBR, weekStartsOn: 1 }), 'dd/MM')} - ${format(endOfWeek(date, { locale: ptBR, weekStartsOn: 1 }), 'dd/MM')}`;
             case 'month':
                 return format(date, 'MMM yyyy', { locale: ptBR });
         }
@@ -177,16 +200,10 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     const columnWidth = getColumnWidth();
     const totalGridWidth = columnWidth * timelineDates.length;
-    const activeLanes = Array.from({ length: maxLaneFromItems + 1 }, (_, i) => i);
     const totalGridHeight = activeLanes.length * 60;
 
-    const getLaneName = (laneId: number) => {
-        const lane = lanes.find(l => l.id === laneId);
-        return lane ? lane.name : `Lane ${laneId + 1}`;
-    };
-
-    const dateCoverage = useMemo(() => {
-        const coverage: DateCoverage = {};
+    const dateCoverage = React.useMemo(() => {
+        const coverage: { [laneId: number]: { [dateStr: string]: boolean } } = {};
         for (let laneId = 0; laneId <= maxLane; laneId++) {
             coverage[laneId] = {};
             timelineDates.forEach(date => {
@@ -211,70 +228,99 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return coverage;
     }, [itemsWithLanes, timelineDates, maxLane]);
 
-    // Função para calcular a nova data baseada na posição do arrasto
-    const calculateNewDate = (pixelOffset: number, referenceDate: Date): Date => {
+    const calculateNewDate = (pixelOffset: number, referenceDate: Date, firstDate: Date, lastDate: Date): Date => {
+        let newDate: Date;
         switch (zoomLevel) {
-            case 'day': {
-                // Cada pixel representa uma fração de um dia
+            case 'day':
                 const dayFraction = pixelOffset / columnWidth;
-                const dayOffset = Math.round(dayFraction);
-                return addDays(referenceDate, dayOffset);
-            }
-            case 'week': {
-                // Cada pixel representa uma fração de uma semana (7 dias)
+                const dayOffsetForDay = Math.round(dayFraction);
+                newDate = addDays(referenceDate, dayOffsetForDay);
+                break;
+            case 'week':
                 const weekFraction = pixelOffset / columnWidth;
-                const dayOffset = Math.round(weekFraction * 7);
-                return addDays(referenceDate, dayOffset);
-            }
-            case 'month': {
-                // A conversão aqui é aproximada, já que meses têm números diferentes de dias
-                // Vamos usar 30 dias como média para simplificar
+                const dayOffsetForWeek = Math.round(weekFraction * 7);
+                newDate = addDays(referenceDate, dayOffsetForWeek);
+                break;
+            case 'month':
                 const monthFraction = pixelOffset / columnWidth;
-                const dayOffset = Math.round(monthFraction * 30);
-                return addDays(referenceDate, dayOffset);
-            }
+                const dayOffsetForMonth = Math.round(monthFraction * 30);
+                newDate = addDays(referenceDate, dayOffsetForMonth);
+                break;
             default:
-                return referenceDate;
+                newDate = referenceDate;
         }
+
+        if (newDate < firstDate) return firstDate;
+        if (newDate > lastDate) return lastDate;
+        return newDate;
     };
 
     const handleDragEnd = (event: DragEndEvent) => {
         const { active, delta } = event;
-
         const itemId = parseInt(active.id as string, 10);
         const item = itemsWithLanes.find(item => item.id === itemId);
 
         if (!item || delta.x === 0) return;
 
-        // Calcular as novas datas com base no deslocamento
         const startDate = parseISO(item.start);
         const endDate = parseISO(item.end);
         const duration = differenceInCalendarDays(endDate, startDate);
 
-        // Calcular nova data de início baseada na distância arrastada
-        const newStartDate = calculateNewDate(delta.x, startDate);
-        // A nova data de término mantém a mesma duração
-        const newEndDate = addDays(newStartDate, duration);
+        const firstDate = timelineDates[0];
+        const lastDate = timelineDates[timelineDates.length - 1];
 
-        // Formatar as datas no formato ISO
+        let newStartDate = calculateNewDate(delta.x, startDate, firstDate, lastDate);
+        let newEndDate = addDays(newStartDate, duration);
+
+        if (newEndDate >= lastDate) {
+            newEndDate = lastDate;
+            newStartDate = addDays(newEndDate, -duration);
+            setDynamicMaxDate(expandMaxDate(currentMaxDate));
+        }
+
+        if (newStartDate <= firstDate) {
+            newStartDate = firstDate;
+            newEndDate = addDays(newStartDate, duration);
+            setDynamicMinDate(expandMinDate(currentMinDate));
+        }
+
+        if (newStartDate < firstDate) {
+            newStartDate = firstDate;
+            newEndDate = addDays(newStartDate, duration);
+        }
+
         const formattedStartDate = format(newStartDate, 'yyyy-MM-dd');
         const formattedEndDate = format(newEndDate, 'yyyy-MM-dd');
 
-        // Atualizar o item
-        const updatedItem = {
-            ...item,
-            start: formattedStartDate,
-            end: formattedEndDate
-        };
-
-        // Atualizar a lista de itens
-        const updatedItems = itemsWithLanes.map(i =>
-            i.id === itemId ? updatedItem : i
-        );
-
+        const updatedItem = { ...item, start: formattedStartDate, end: formattedEndDate };
+        const updatedItems = itemsWithLanes.map(i => i.id === itemId ? updatedItem : i);
         setItemsWithLanes(assignLanes(updatedItems));
-        console.log('Item reposicionado:', updatedItem);
     };
+
+    const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
+        if ((e.target as HTMLElement).closest('.timeline-item')) return;
+
+        setIsDraggingTimeline(true);
+        setStartX(e.pageX);
+        setScrollLeftStart(containerRef.current?.scrollLeft || 0);
+        e.preventDefault();
+    };
+
+    const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+        if (!isDraggingTimeline || !containerRef.current) return;
+
+        const deltaX = e.pageX - startX;
+        containerRef.current.scrollLeft = scrollLeftStart - deltaX;
+    };
+
+    const handleMouseUp = () => {
+        setIsDraggingTimeline(false);
+    };
+
+    useEffect(() => {
+        window.addEventListener('mouseup', () => setIsDraggingTimeline(false));
+        return () => window.removeEventListener('mouseup', () => setIsDraggingTimeline(false));
+    }, []);
 
     return (
         <TimelineContainer>
@@ -290,9 +336,15 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 </ZoomButton>
             </TimelineControls>
 
-            <ScrollContainer ref={containerRef} onWheel={handleWheel}>
+            <ScrollContainer
+                ref={containerRef}
+                onWheel={handleWheel}
+                onMouseDown={handleMouseDown}
+                onMouseMove={handleMouseMove}
+                onMouseUp={handleMouseUp}
+                style={{ cursor: isDraggingTimeline ? 'grabbing' : 'grab' }}
+            >
                 <TimelineHeader>
-                    <HeaderLabel>Data</HeaderLabel>
                     <DateHeaderContainer style={{ width: `${totalGridWidth}px` }}>
                         {zoomLevel === 'day' && (
                             <div className="month-row">
@@ -335,44 +387,10 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 </TimelineHeader>
 
                 <TimelineBody>
-                    <LanesColumn className="lanes-column">
-                        {activeLanes.map((laneId, index) => (
-                            <LaneLabel key={laneId} isLast={index === activeLanes.length - 1}>
-                                {editingLane === laneId ? (
-                                    <>
-                                        <LaneNameInput
-                                            type="text"
-                                            value={newLaneName}
-                                            onChange={(e) => setNewLaneName(e.target.value)}
-                                            autoFocus
-                                        />
-                                        <LaneActions>
-                                            <SaveButton onClick={() => handleSaveLaneName(laneId)}>
-                                                ✓
-                                            </SaveButton>
-                                            <CancelButton onClick={handleCancelEdit}>
-                                                ✕
-                                            </CancelButton>
-                                        </LaneActions>
-                                    </>
-                                ) : (
-                                    <>
-                                        {getLaneName(laneId)}
-                                        <EditButton onClick={() => handleEditLane(laneId)}>
-                                            ✎
-                                        </EditButton>
-                                    </>
-                                )}
-                            </LaneLabel>
-                        ))}
-                    </LanesColumn>
-
                     <DndContext onDragEnd={handleDragEnd}>
-                        <TimelineGrid style={{ width: `${totalGridWidth}px`, height: `${totalGridHeight}px`, position: 'relative' }}>
+                        <TimelineGrid style={{ width: `${totalGridWidth}px`, height: `${totalGridHeight}px` }}>
                             {activeLanes.map((laneId) => (
-                                <div
-                                    key={laneId}
-                                >
+                                <div key={laneId}>
                                     {itemsWithLanes
                                         .filter(item => item.lane === laneId)
                                         .sort((a, b) => new Date(a.start).getTime() - new Date(b.start).getTime())
@@ -381,8 +399,8 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                                 key={item.id}
                                                 item={item}
                                                 items={itemsWithLanes}
-                                                minDate={minDate}
-                                                maxDate={maxDate}
+                                                minDate={currentMinDate}
+                                                maxDate={currentMaxDate}
                                                 totalWidth={totalGridWidth}
                                                 maxLanes={activeLanes.length}
                                                 columnWidth={columnWidth}
@@ -426,6 +444,8 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         </TimelineGrid>
                     </DndContext>
                 </TimelineBody>
+
+                <ScrollArrows scrollContainerRef={containerRef} totalGridWidth={totalGridWidth} />
             </ScrollContainer>
 
             <Instructions>
@@ -435,7 +455,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     <li>Redimensione itens arrastando as bordas esquerdas ou direitas</li>
                     <li>Clique duplo para editar nomes de itens</li>
                     <li>Use os botões de zoom ou role o mouse com Alt pressionado para mudar a visualização</li>
-                    <li>Clique no ícone de edição para renomear uma lane</li>
+                    <li>Arraste a timeline com o mouse para navegar pelas datas</li>
                     <li>Áreas em cinza claro indicam dias sem itens programados</li>
                 </ul>
             </Instructions>
