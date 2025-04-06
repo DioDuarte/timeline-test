@@ -64,16 +64,16 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
         switch (zoom) {
             case 'day':
-                adjustedMinDate = subDays(minDate, 30); // 30 dias antes
-                adjustedMaxDate = addDays(maxDate, 30); // 30 dias depois
+                adjustedMinDate = subDays(minDate, 3); // 3 dias antes
+                adjustedMaxDate = addDays(maxDate, 3); // 3 dias depois
                 break;
             case 'week':
-                adjustedMinDate = subWeeks(minDate, 20); // 20 semanas antes
-                adjustedMaxDate = addWeeks(maxDate, 20); // 20 semanas depois
+                adjustedMinDate = subWeeks(minDate, 2); // 2 semanas antes
+                adjustedMaxDate = addWeeks(maxDate, 2); // 2 semanas depois
                 break;
             case 'month':
-                adjustedMinDate = subMonths(minDate, 12); // 12 meses antes
-                adjustedMaxDate = addMonths(maxDate, 12); // 12 meses depois
+                adjustedMinDate = subMonths(minDate, 1); // 1 meses antes
+                adjustedMaxDate = addMonths(maxDate, 1); // 1 meses depois
                 break;
             default:
                 adjustedMinDate = minDate;
