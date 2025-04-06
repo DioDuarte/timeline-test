@@ -34,7 +34,6 @@ import { assignLanes } from '../../utils/assignLanes';
 import { useTimelineConfig } from '../../context/TimelineContext';
 import { getDateRange, getTimelineDates } from '../../utils/dateUtils';
 import TimelineItem from '../TimelineItem/TimelineItem';
-import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
 
 interface TimelineProps {
@@ -48,46 +47,16 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [dynamicMaxDate, setDynamicMaxDate] = useState<Date | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
+    // Estados para arrastar a timeline
     const [isDraggingTimeline, setIsDraggingTimeline] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
-    // Obter os limites iniciais dos itens e adicionar padding extra baseado no zoom
     const { minDate: initialMinDate, maxDate: initialMaxDate } = getDateRange(items);
-
-    // Ajustar os limites iniciais com base no zoomLevel
-    const adjustInitialDates = (minDate: Date, maxDate: Date, zoom: ZoomLevel) => {
-        let adjustedMinDate: Date;
-        let adjustedMaxDate: Date;
-
-        switch (zoom) {
-            case 'day':
-                adjustedMinDate = subDays(minDate, 3); // 3 dias antes
-                adjustedMaxDate = addDays(maxDate, 3); // 3 dias depois
-                break;
-            case 'week':
-                adjustedMinDate = subWeeks(minDate, 2); // 2 semanas antes
-                adjustedMaxDate = addWeeks(maxDate, 2); // 2 semanas depois
-                break;
-            case 'month':
-                adjustedMinDate = subMonths(minDate, 1); // 1 meses antes
-                adjustedMaxDate = addMonths(maxDate, 1); // 1 meses depois
-                break;
-            default:
-                adjustedMinDate = minDate;
-                adjustedMaxDate = maxDate;
-        }
-
-        return { adjustedMinDate, adjustedMaxDate };
-    };
-
-    const { adjustedMinDate, adjustedMaxDate } = adjustInitialDates(initialMinDate, initialMaxDate, zoomLevel);
-
-    // Usar os limites ajustados ou os dinâmicos (se houver expansão)
-    const currentMinDate = dynamicMinDate || adjustedMinDate;
-    const currentMaxDate = dynamicMaxDate || adjustedMaxDate;
+    const currentMinDate = dynamicMinDate || initialMinDate;
+    const currentMaxDate = dynamicMaxDate || initialMaxDate;
     const timelineDates = getTimelineDates(currentMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
 
     useEffect(() => {
@@ -144,7 +113,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         if (itemsAtEnd && !dynamicMaxDate) {
             setDynamicMaxDate(expandMaxDate(initialMaxDate));
         }
-    }, [items, timelineDates]);
+    }, [items]);
 
     const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (e.altKey) {
@@ -297,29 +266,57 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setItemsWithLanes(assignLanes(updatedItems));
     };
 
+    // Função para encerrar o arrasto
+    const stopDragging = () => {
+        setIsDraggingTimeline(false);
+    };
+
+    // Manipulador de mouse down
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        if ((e.target as HTMLElement).closest('.timeline-item')) return;
+        if (e.button !== 0) return; // Apenas botão esquerdo do mouse
+        const target = e.target as HTMLElement;
+        if (target.closest('.timeline-item')) return;
 
         setIsDraggingTimeline(true);
         setStartX(e.pageX);
         setScrollLeftStart(containerRef.current?.scrollLeft || 0);
-        e.preventDefault();
+
+        // Adicionar ouvinte global para mouseup
+        document.addEventListener('mouseup', handleGlobalMouseUp);
     };
 
+    // Manipulador de mouse move
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-        if (!isDraggingTimeline || !containerRef.current) return;
-
-        const deltaX = e.pageX - startX;
-        containerRef.current.scrollLeft = scrollLeftStart - deltaX;
+        if (!isDraggingTimeline) return;
+        e.preventDefault();
+        const x = e.pageX;
+        const walk = x - startX;
+        if (containerRef.current) {
+            containerRef.current.scrollLeft = scrollLeftStart - walk;
+        }
     };
 
-    const handleMouseUp = () => {
-        setIsDraggingTimeline(false);
+    // Manipulador global de mouse up
+    const handleGlobalMouseUp = () => {
+        stopDragging();
+        // Remover ouvinte global
+        document.removeEventListener('mouseup', handleGlobalMouseUp);
     };
 
+    // Manipulador de mouse leave
+    const handleMouseLeave = () => {
+        if (isDraggingTimeline) {
+            stopDragging();
+            // Garantir que o ouvinte global seja removido
+            document.removeEventListener('mouseup', handleGlobalMouseUp);
+        }
+    };
+
+    // Limpeza ao desmontar o componente
     useEffect(() => {
-        window.addEventListener('mouseup', () => setIsDraggingTimeline(false));
-        return () => window.removeEventListener('mouseup', () => setIsDraggingTimeline(false));
+        return () => {
+            document.removeEventListener('mouseup', handleGlobalMouseUp);
+        };
     }, []);
 
     return (
@@ -341,7 +338,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 onWheel={handleWheel}
                 onMouseDown={handleMouseDown}
                 onMouseMove={handleMouseMove}
-                onMouseUp={handleMouseUp}
+                onMouseLeave={handleMouseLeave}
                 style={{ cursor: isDraggingTimeline ? 'grabbing' : 'grab' }}
             >
                 <TimelineHeader>
@@ -444,8 +441,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         </TimelineGrid>
                     </DndContext>
                 </TimelineBody>
-
-                <ScrollArrows scrollContainerRef={containerRef} totalGridWidth={totalGridWidth} />
             </ScrollContainer>
 
             <Instructions>
@@ -455,7 +450,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     <li>Redimensione itens arrastando as bordas esquerdas ou direitas</li>
                     <li>Clique duplo para editar nomes de itens</li>
                     <li>Use os botões de zoom ou role o mouse com Alt pressionado para mudar a visualização</li>
-                    <li>Arraste a timeline com o mouse para navegar pelas datas</li>
+                    <li>Arraste a timeline com o mouse para navegar horizontalmente</li>
                     <li>Áreas em cinza claro indicam dias sem itens programados</li>
                 </ul>
             </Instructions>
