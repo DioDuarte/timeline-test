@@ -41,14 +41,12 @@ interface TimelineProps {
 
 const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [itemsWithLanes, setItemsWithLanes] = useState<TimelineItemType[]>([]);
-    const [containerWidth, setContainerWidth] = useState(0);
     const [dynamicMinDate, setDynamicMinDate] = useState<Date | null>(null);
     const [dynamicMaxDate, setDynamicMaxDate] = useState<Date | null>(null);
-    const [visibleRange, setVisibleRange] = useState({ startIndex: 0, endIndex: 50 });
     const [isDragging, setIsDragging] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
-    const [lastMinExpansion, setLastMinExpansion] = useState<Date | null>(null); // Controle de expansão
+    const [lastMinExpansion, setLastMinExpansion] = useState<Date | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
@@ -61,17 +59,18 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const currentMaxDate = dynamicMaxDate || initialMaxDate;
     const timelineDates = getTimelineDates(currentMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
 
-    // Atualizar largura do container
-    useEffect(() => {
-        const updateWidth = () => {
-            if (containerRef.current) {
-                setContainerWidth(containerRef.current.clientWidth);
-            }
-        };
-        window.addEventListener('resize', updateWidth);
-        updateWidth();
-        return () => window.removeEventListener('resize', updateWidth);
-    }, [timelineDates.length, zoomLevel]);
+    // Definir largura fixa das colunas com base no nível de zoom
+    const getFixedColumnWidth = (): number => {
+        switch (zoomLevel) {
+            case 'day': return 60;   // Largura fixa para dias
+            case 'week': return 120; // Largura fixa para semanas (2x o dia)
+            case 'month': return 240; // Largura fixa para meses (4x o dia)
+            default: return 60;
+        }
+    };
+
+    const columnWidth = getFixedColumnWidth();
+    const totalGridWidth = columnWidth * timelineDates.length;
 
     // Atribuir lanes aos itens
     useEffect(() => {
@@ -81,34 +80,26 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     // Funções de expansão de datas (incremental)
     const expandMinDate = (currentMin: Date) => {
         switch (zoomLevel) {
-            case 'day': return subDays(currentMin, 1); // 1 dia por vez
-            case 'week': return subWeeks(currentMin, 1); // 1 semana por vez
-            case 'month': return subMonths(currentMin, 1); // 1 mês por vez
+            case 'day': return subDays(currentMin, 1);
+            case 'week': return subWeeks(currentMin, 1);
+            case 'month': return subMonths(currentMin, 1);
             default: return currentMin;
         }
     };
 
     const expandMaxDate = (currentMax: Date) => {
         switch (zoomLevel) {
-            case 'day': return addDays(currentMax, 1); // 1 dia por vez
-            case 'week': return addWeeks(currentMax, 1); // 1 semana por vez
-            case 'month': return addMonths(currentMax, 1); // 1 mês por vez
+            case 'day': return addDays(currentMax, 1);
+            case 'week': return addWeeks(currentMax, 1);
+            case 'month': return addMonths(currentMax, 1);
             default: return currentMax;
         }
-    };
-
-    // Calcular largura da coluna
-    const getColumnWidth = () => {
-        const minColumnWidth = 60;
-        const calculatedWidth = containerWidth / 50;
-        return Math.max(minColumnWidth, calculatedWidth);
     };
 
     // Ajustar scroll após expansão de minDate
     useEffect(() => {
         if (!isDragging || !containerRef.current || !dynamicMinDate || dynamicMinDate === lastMinExpansion) return;
 
-        const columnWidth = getColumnWidth();
         const currentScrollLeft = containerRef.current.scrollLeft;
         const previousDatesLength = timelineDates.length;
         const newTimelineDates = getTimelineDates(dynamicMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
@@ -117,7 +108,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         if (currentScrollLeft < 10 && addedColumns > 0) {
             const scrollAdjustment = addedColumns * columnWidth;
             containerRef.current.scrollLeft += scrollAdjustment;
-            setLastMinExpansion(dynamicMinDate); // Atualiza o controle de expansão
+            setLastMinExpansion(dynamicMinDate);
         }
     }, [dynamicMinDate, isDragging, timelineDates.length]);
 
@@ -133,40 +124,26 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
         if (!isDragging || !containerRef.current) return;
 
-        const deltaX = e.pageX - startX; // Positivo: arrasta para a direita; Negativo: arrasta para a esquerda
+        const deltaX = e.pageX - startX;
         const newScrollLeft = scrollLeftStart - deltaX;
         containerRef.current.scrollLeft = newScrollLeft;
 
-        const columnWidth = getColumnWidth();
         const totalWidth = timelineDates.length * columnWidth;
-        const newStartIndex = Math.floor(newScrollLeft / columnWidth);
-        const visibleColumns = Math.ceil(containerWidth / columnWidth);
-        const newEndIndex = newStartIndex + visibleColumns;
 
-        // Determinar direção do arrastar
-        const isDraggingRight = deltaX > 0;
-        const isDraggingLeft = deltaX < 0;
-
-        // Expansão à esquerda (passado) apenas se arrastar para a esquerda e não expandiu recentemente
-        if (isDraggingLeft && newScrollLeft < 10 && newStartIndex >= 0 && dynamicMinDate !== lastMinExpansion) {
+        // Expansão à esquerda (passado)
+        if (newScrollLeft < 10 && dynamicMinDate !== lastMinExpansion) {
             setDynamicMinDate(expandMinDate(currentMinDate));
         }
 
-        // Expansão à direita (futuro) apenas se arrastar para a direita
-        if (isDraggingRight && newScrollLeft + containerWidth > totalWidth - 10 && newEndIndex < timelineDates.length) {
+        // Expansão à direita (futuro)
+        if (newScrollLeft + containerRef.current.clientWidth > totalWidth - 10) {
             setDynamicMaxDate(expandMaxDate(currentMaxDate));
         }
-
-        // Atualizar visibleRange
-        setVisibleRange({
-            startIndex: Math.max(0, newStartIndex),
-            endIndex: Math.min(timelineDates.length - 1, newEndIndex),
-        });
     };
 
     const handleMouseUp = () => {
         setIsDragging(false);
-        setLastMinExpansion(null); // Resetar controle ao finalizar arrastar
+        setLastMinExpansion(null);
     };
 
     useEffect(() => {
@@ -185,7 +162,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             setZoomLevel(zoomLevels[newIndex]);
             setDynamicMinDate(null);
             setDynamicMaxDate(null);
-            setVisibleRange({ startIndex: 0, endIndex: 50 });
         }
     };
 
@@ -203,7 +179,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
         const firstDate = timelineDates[0];
         const lastDate = timelineDates[timelineDates.length - 1];
-        const columnWidth = getColumnWidth();
 
         const calculateNewDate = (pixelOffset: number, referenceDate: Date) => {
             let newDate: Date;
@@ -237,8 +212,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     // Renderização
     const maxLane = Math.max(...itemsWithLanes.map((item) => item.lane || 0), 0);
     const activeLanes = Array.from({ length: maxLane + 1 }, (_, i) => i);
-    const columnWidth = getColumnWidth();
-    const totalGridWidth = columnWidth * timelineDates.length;
     const totalGridHeight = activeLanes.length * 60;
 
     const formatHeaderDate = (date: Date) => {
@@ -297,17 +270,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             {activeLanes.map((laneId) =>
                                 itemsWithLanes
                                     .filter((item) => item.lane === laneId)
-                                    .filter((item) => {
-                                        const startDate = parseISO(item.start);
-                                        const endDate = parseISO(item.end);
-                                        const startIndex = timelineDates.findIndex((d) => d >= startDate);
-                                        const endIndex = timelineDates.findIndex((d) => d >= endDate);
-                                        return (
-                                            (startIndex >= visibleRange.startIndex && startIndex <= visibleRange.endIndex) ||
-                                            (endIndex >= visibleRange.startIndex && endIndex <= visibleRange.endIndex) ||
-                                            (startIndex < visibleRange.startIndex && endIndex > visibleRange.endIndex)
-                                        );
-                                    })
                                     .map((item) => (
                                         <TimelineItem
                                             key={item.id}
@@ -322,21 +284,17 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                         />
                                     ))
                             )}
-                            {activeLanes.map((laneId) =>
-                                timelineDates
-                                    .slice(visibleRange.startIndex, visibleRange.endIndex + 1)
-                                    .map((date, dateIndex) => (
-                                        <VerticalGridLine
-                                            key={`${laneId}-${dateIndex}`}
-                                            style={{
-                                                left: `${(dateIndex + visibleRange.startIndex) * columnWidth}px`,
-                                                height: `${totalGridHeight}px`,
-                                            }}
-                                            isWeekend={date.getDay() === 0 || date.getDay() === 6}
-                                            isMonthStart={date.getDate() === 1}
-                                        />
-                                    ))
-                            )}
+                            {timelineDates.map((date, dateIndex) => (
+                                <VerticalGridLine
+                                    key={dateIndex}
+                                    style={{
+                                        left: `${dateIndex * columnWidth}px`,
+                                        height: `${totalGridHeight}px`,
+                                    }}
+                                    isWeekend={date.getDay() === 0 || date.getDay() === 6}
+                                    isMonthStart={date.getDate() === 1}
+                                />
+                            ))}
                             {activeLanes.slice(0, -1).map((laneId, index) => (
                                 <HorizontalGridLine
                                     key={`hgrid-${laneId}`}
