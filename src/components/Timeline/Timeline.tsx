@@ -63,7 +63,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const getFixedColumnWidth = (): number => {
         switch (zoomLevel) {
             case 'day': return 60;   // Largura fixa para dias
-            case 'week': return 120; // Largura fixa para semanas (2x o dia)
+            case 'week': return 180; // Largura fixa para semanas (2x o dia)
             case 'month': return 240; // Largura fixa para meses (4x o dia)
             default: return 60;
         }
