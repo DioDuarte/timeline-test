@@ -65,16 +65,7 @@ export const TimelineHeader = styled.div`
   top: 0;
   background-color: white;
   z-index: 20;
-`;
-
-export const HeaderLabel = styled.div`
-  min-width: 101px;
-  padding: 10px;
-  font-weight: bold;
-  border-right: 2px solid #e0e0e0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  transition: width 0.2s ease-out; // Adiciona transição suave
 `;
 
 export const DateHeaderContainer = styled.div`
@@ -130,33 +121,11 @@ export const TimelineBody = styled.div`
   flex: 1;
 `;
 
-export const LanesColumn = styled.div`
-  min-width: 100px;
-  padding: 10px;
-  border-right: 1px solid #e0e0e0;
-  height: 60px;
-  display: flex;
-  flex-direction: column;
-  flex: 0 0 auto;
-`;
-
-export const LaneLabel = styled.div<{ isLast: boolean }>`
-  padding: 10px 5px;
-  box-sizing: border-box;
-  border-bottom: ${props => !props.isLast ? '1px solid #f0f0f0' : 'none'};
-  display: flex;
-  align-items: center;
-  min-height: 60px;
-  flex: 1;
-`;
-
-
-// Atualização do TimelineGrid para melhor apresentação
 export const TimelineGrid = styled.div`
   position: relative;
   flex: 1;
   background: linear-gradient(to bottom, #ffffff, #fafafa);
-  //min-height: 300px;
+  transition: width 0.2s ease-out; // Adiciona transição suave
 `;
 
 export const VerticalGridLine = styled.div<{
@@ -189,114 +158,9 @@ export const Instructions = styled.div`
   color: #666;
 `;
 
-export const LaneNameInput = styled.input`
-  flex: 1;
-  padding: 2px 4px;
-  font-size: 14px;
-  border: 1px solid #3498db;
-  border-radius: 3px;
-  outline: none;
-  margin-right: 5px;
-`;
-
-export const LaneActions = styled.div`
-  display: flex;
-  gap: 4px;
-`;
-
-export const EditButton = styled.button`
-  margin-left: auto;
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #7f8c8d;
-  padding: 2px 5px;
-  font-size: 12px;
-  visibility: hidden;
-
-  ${LaneLabel}:hover & {
-    visibility: visible;
-  }
-
-  &:hover {
-    color: #3498db;
-  }
-`;
-
-export const SaveButton = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #27ae60;
-  font-weight: bold;
-  
-  &:hover {
-    color: #2ecc71;
-  }
-`;
-
-export const CancelButton = styled.button`
-  background: none;
-  border: none;
-  cursor: pointer;
-  color: #e74c3c;
-  font-weight: bold;
-  
-  &:hover {
-    color: #c0392b;
-  }
-`;
-
-export const EmptyCell = styled.div`
-  position: absolute;
-  background-color: #f5f5f5;
-  z-index: 1;
-`;
-
-// Adicione estes componentes ao arquivo styles.ts
-
-export const CursorNavigationControls = styled.div`
-    display: flex;
-    margin-left: 20px;
-    gap: 10px;
-`;
-
-export const CursorNavigationButton = styled.button`
-    background: #2c3e50;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 8px 12px;
-    font-size: 12px;
-    cursor: pointer;
-    transition: background 0.2s;
-    
-    &:hover {
-        background: #34495e;
-    }
-    
-    &:active {
-        background: #1a2530;
-    }
-`;
-
-export const CursorIndicator = styled.div`
+export const Sentinel = styled.div`
+    width: 1px;
+    height: 100%;
     position: absolute;
-    width: 2px;
-    background: rgba(255, 0, 0, 0.7);
-    z-index: 15;
-    top: 0;
     pointer-events: none;
-    box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
-    
-    &::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -4px;
-        width: 10px;
-        height: 10px;
-        background: red;
-        border-radius: 50%;
-    }
 `;

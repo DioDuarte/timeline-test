@@ -10,7 +10,7 @@ import {
     endOfWeek,
     subDays,
     subWeeks,
-    subMonths, differenceInDays,
+    subMonths,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -25,7 +25,9 @@ import {
     TimelineGrid,
     VerticalGridLine,
     HorizontalGridLine,
-    Instructions, TimelineWrapper,
+    Instructions,
+    TimelineWrapper,
+    Sentinel,
 } from './styles';
 import { TimelineItem as TimelineItemType, ZoomLevel } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
@@ -47,15 +49,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [isDragging, setIsDragging] = useState(false);
     const [startX, setStartX] = useState(0);
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
-    const [lastMinExpansion, setLastMinExpansion] = useState<Date | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
-    const accumulatedScrollDistanceRef = useRef<number>(0); // Acumulador para lazy loading
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
     const [selectedItemId, setSelectedItemId] = useState<number | undefined>();
     const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
-    const [pendingScrollItem, setPendingScrollItem] = useState<TimelineItemType | null>(null); // Novo estado
-
-
+    const previousDatesLengthRef = useRef<number>(0);
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
@@ -85,8 +83,8 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setItemsWithLanes(assignLanes(items));
     }, [items]);
 
-    // Funções de expansão de datas
-    const expandMinDate = (currentMin: Date, steps: number = 1) => {
+    // Funções de expansão
+    const expandMinDate = (currentMin: Date, steps: number = 5) => {
         switch (zoomLevel) {
             case 'day': return subDays(currentMin, steps);
             case 'week': return subWeeks(currentMin, steps);
@@ -95,38 +93,62 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         }
     };
 
-    const expandMaxDate = (currentMax: Date) => {
+    const expandMaxDate = (currentMax: Date, steps: number = 5) => {
         switch (zoomLevel) {
-            case 'day': return addDays(currentMax, 1);
-            case 'week': return addWeeks(currentMax, 1);
-            case 'month': return addMonths(currentMax, 1);
+            case 'day': return addDays(currentMax, steps);
+            case 'week': return addWeeks(currentMax, steps);
+            case 'month': return addMonths(currentMax, steps);
             default: return currentMax;
         }
     };
 
-    // Ajustar scroll após expansão de minDate
+    // Configurar o IntersectionObserver para lazy loading
     useEffect(() => {
-        if (!isDragging || !containerRef.current || !dynamicMinDate || dynamicMinDate === lastMinExpansion) return;
+        if (!containerRef.current) return;
 
-        const previousDatesLength = timelineDates.length;
-        const newTimelineDates = getTimelineDates(dynamicMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
-        const addedColumns = newTimelineDates.length - previousDatesLength;
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting) {
+                        if (entry.target.id === 'sentinel-left' && containerRef.current!.scrollLeft < 100) {
+                            const previousLength = timelineDates.length;
+                            const newMinDate = expandMinDate(currentMinDate);
+                            const newDates = getTimelineDates(newMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
+                            const addedColumns = newDates.length - previousLength;
+                            const scrollAdjustment = addedColumns * columnWidth;
 
-        if (addedColumns > 0) {
-            const scrollAdjustment = addedColumns * columnWidth;
-            containerRef.current.scrollLeft += scrollAdjustment;
-            setLastMinExpansion(dynamicMinDate);
-        }
-    }, [dynamicMinDate, isDragging, timelineDates.length]);
+                            // Ajustar o scroll antes de atualizar o estado
+                            containerRef.current!.scrollLeft += scrollAdjustment;
+                            setDynamicMinDate(newMinDate);
+                            previousDatesLengthRef.current = newDates.length;
+                        } else if (entry.target.id === 'sentinel-right') {
+                            const newMaxDate = expandMaxDate(currentMaxDate);
+                            setDynamicMaxDate(newMaxDate);
+                        }
+                    }
+                });
+            },
+            {
+                root: containerRef.current,
+                threshold: 0,
+                rootMargin: '0px 0px 0px 200px',
+            }
+        );
+
+        const leftSentinel = document.getElementById('sentinel-left');
+        const rightSentinel = document.getElementById('sentinel-right');
+        if (leftSentinel) observer.observe(leftSentinel);
+        if (rightSentinel) observer.observe(rightSentinel);
+
+        return () => observer.disconnect();
+    }, [currentMinDate, currentMaxDate, zoomLevel, timelineDates, columnWidth]);
 
     // Manipulação de eventos de arrastar
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-
         if (isItemModalOpen || (e.target as HTMLElement).closest('.timeline-item')) return;
         setIsDragging(true);
         setStartX(e.pageX);
         setScrollLeftStart(containerRef.current?.scrollLeft || 0);
-        accumulatedScrollDistanceRef.current = 0; // Resetar acumulador
         e.preventDefault();
     };
 
@@ -136,32 +158,10 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         const deltaX = e.pageX - startX;
         const newScrollLeft = scrollLeftStart - deltaX;
         containerRef.current.scrollLeft = newScrollLeft;
-
-        const totalWidth = timelineDates.length * columnWidth;
-
-        // Lazy loading à esquerda (passado)
-        if (newScrollLeft < 10) {
-            accumulatedScrollDistanceRef.current += Math.abs(deltaX); // Acumula distância scrollada
-            const minDistanceToLoad = columnWidth * 5; // Carrega só após 5 colunas de distância
-            const columnsToAdd = Math.floor(accumulatedScrollDistanceRef.current / minDistanceToLoad);
-
-            if (columnsToAdd >= 1 && dynamicMinDate !== lastMinExpansion) {
-                const steps = columnsToAdd * 5; // Expande em blocos de 5 unidades (dias, semanas, meses)
-                setDynamicMinDate(expandMinDate(currentMinDate, steps));
-                accumulatedScrollDistanceRef.current = 0; // Resetar após carregar
-            }
-        }
-
-        // Expansão à direita (futuro)
-        if (newScrollLeft + containerRef.current.clientWidth > totalWidth - 10) {
-            setDynamicMaxDate(expandMaxDate(currentMaxDate));
-        }
     };
 
     const handleMouseUp = () => {
         setIsDragging(false);
-        setLastMinExpansion(null);
-        accumulatedScrollDistanceRef.current = 0; // Resetar acumulador
     };
 
     useEffect(() => {
@@ -185,7 +185,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     // Manipulação de arrastar itens
     const handleDragEnd = (event: DragEndEvent) => {
-        if(isItemModalOpen) return;
+        if (isItemModalOpen) return;
         const { active, delta } = event;
         const itemId = parseInt(active.id as string, 10);
         const item = itemsWithLanes.find((i) => i.id === itemId);
@@ -245,15 +245,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const scrollToItem = (item: TimelineItemType) => {
         setSelectedItemId(item.id);
 
-        if (!containerRef.current) {
-            return;
-        }
+        if (!containerRef.current) return;
 
-        const {
-            clientWidth: containerWidth,
-            scrollLeft: currentScroll,
-            scrollWidth: totalWidth
-        } = containerRef.current;
+        const { clientWidth: containerWidth, scrollLeft: currentScroll, scrollWidth: totalWidth } = containerRef.current;
 
         const itemStart = parseISO(item.start);
         const itemEnd = parseISO(item.end);
@@ -261,9 +255,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         const findDateIndex = (date: Date) => {
             switch (zoomLevel) {
                 case 'day':
-                    return timelineDates.findIndex((d) =>
-                        format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                    );
+                    return timelineDates.findIndex((d) => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
                 case 'week':
                     return timelineDates.findIndex((d) => {
                         const weekStart = startOfWeek(d, { locale: ptBR, weekStartsOn: 1 });
@@ -271,9 +263,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         return format(weekStart, 'yyyy-MM-dd') === format(itemWeekStart, 'yyyy-MM-dd');
                     });
                 case 'month':
-                    return timelineDates.findIndex((d) =>
-                        format(d, 'yyyy-MM') === format(date, 'yyyy-MM')
-                    );
+                    return timelineDates.findIndex((d) => format(d, 'yyyy-MM') === format(date, 'yyyy-MM'));
                 default:
                     return -1;
             }
@@ -284,12 +274,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
         if (startIndex === -1 || endIndex === -1) {
             const newMinDate = itemStart < timelineDates[0] ? itemStart : timelineDates[0];
-            const newMaxDate = itemEnd > timelineDates[timelineDates.length - 1]
-                ? itemEnd
-                : timelineDates[timelineDates.length - 1];
+            const newMaxDate = itemEnd > timelineDates[timelineDates.length - 1] ? itemEnd : timelineDates[timelineDates.length - 1];
             setDynamicMinDate(newMinDate);
             setDynamicMaxDate(newMaxDate);
-            setPendingScrollItem(item);
             return;
         }
 
@@ -309,37 +296,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             behavior
         });
     };
-
-    useEffect(() => {
-        if (pendingScrollItem && containerRef.current) {
-            const findDateIndex = (date: Date) => {
-                switch (zoomLevel) {
-                    case 'day':
-                        return timelineDates.findIndex((d) =>
-                            format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
-                        );
-                    case 'week':
-                        return timelineDates.findIndex((d) => {
-                            const weekStart = startOfWeek(d, { locale: ptBR, weekStartsOn: 1 });
-                            const itemWeekStart = startOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
-                            return format(weekStart, 'yyyy-MM-dd') === format(itemWeekStart, 'yyyy-MM-dd');
-                        });
-                    case 'month':
-                        return timelineDates.findIndex((d) =>
-                            format(d, 'yyyy-MM') === format(date, 'yyyy-MM')
-                        );
-                    default:
-                        return -1;
-                }
-            };
-
-            const startIndex = findDateIndex(parseISO(pendingScrollItem.start));
-            if (startIndex !== -1) {
-                scrollToItem(pendingScrollItem);
-                setPendingScrollItem(null);
-            }
-        }
-    }, [timelineDates, pendingScrollItem]);
 
     return (
         <TimelineWrapper>
@@ -386,6 +342,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     <TimelineBody>
                         <DndContext onDragEnd={handleDragEnd}>
                             <TimelineGrid style={{ width: `${totalGridWidth}px`, minHeight: `${totalGridHeight}px` }}>
+                                <Sentinel id="sentinel-left" style={{ left: '0px' }} />
                                 {activeLanes.map((laneId) =>
                                     itemsWithLanes
                                         .filter((item) => item.lane === laneId)
@@ -423,6 +380,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                         style={{ top: `${(index + 1) * 60}px` }}
                                     />
                                 ))}
+                                <Sentinel id="sentinel-right" style={{ left: `${totalGridWidth - 1}px` }} />
                             </TimelineGrid>
                         </DndContext>
                     </TimelineBody>
@@ -439,9 +397,14 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     </ul>
                 </Instructions>
             </TimelineContainer>
-            <ItemsListPanel  items={itemsWithLanes} selectedItemId={selectedItemId} onItemSelect={scrollToItem} timelineRef={containerRef} onItemHover={setHoveredItemId}/>
+            <ItemsListPanel
+                items={itemsWithLanes}
+                selectedItemId={selectedItemId}
+                onItemSelect={scrollToItem}
+                timelineRef={containerRef}
+                onItemHover={setHoveredItemId}
+            />
         </TimelineWrapper>
-
     );
 };
 
