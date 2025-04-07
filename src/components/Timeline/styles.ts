@@ -143,11 +143,10 @@ export const VerticalGridLine = styled.div<{
   z-index: ${props => props.isMonthStart ? 2 : 1};
 `;
 
-export const HorizontalGridLine = styled.div`
+export const HorizontalGridLine = styled.div<{ totalWidth?: number }>`
   position: absolute;
   left: 0;
-  right: 0;
-  width: 100%;
+  width: ${props => props.totalWidth ? `${props.totalWidth}px` : '100%'};
   height: 1px;
   background-color: #f0f0f0;
 `;
@@ -174,10 +173,9 @@ export const FocusIndicator = styled.div<{ left: number; isActive: boolean }>`
   width: 2px;
   background-color: #ff6b6b;
   z-index: 10;
-  opacity: ${props => (props.isActive ? 0.8 : 0)};
+  opacity: 0.8;
   transition: opacity 0.3s ease;
   box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
-
   &::before {
     content: '';
     position: absolute;
