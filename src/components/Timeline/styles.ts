@@ -165,7 +165,7 @@ export const Sentinel = styled.div`
     pointer-events: none;
 `;
 
-// Adicione este componente de estilo ao arquivo styles.ts
+// Atualização do FocusIndicator para incluir um tooltip
 export const FocusIndicator = styled.div<{ left: number; isActive: boolean }>`
   position: absolute;
   left: ${props => props.left}px;
@@ -189,4 +189,22 @@ export const FocusIndicator = styled.div<{ left: number; isActive: boolean }>`
     border-radius: 50%;
     box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
   }
+`;
+
+export const FocusTooltip = styled.div<{ isVisible: boolean }>`
+  position: absolute;
+  top: -40px;
+  left: -50px;
+  width: 100px;
+  background-color: #333;
+  color: white;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: center;
+  opacity: ${props => (props.isVisible ? 1 : 0)};
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+  z-index: 20;
+  white-space: nowrap;
 `;

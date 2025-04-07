@@ -29,7 +29,6 @@ import {
     Instructions,
     TimelineWrapper,
     Sentinel,
-    FocusIndicator,
 } from './styles';
 import { TimelineItem as TimelineItemType, ZoomLevel } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
@@ -39,6 +38,8 @@ import TimelineItem from '../TimelineItem/TimelineItem';
 import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
 import ItemsListPanel from "../TimelinePanel/TimelinePanel";
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
+
+
 
 interface TimelineProps {
     items: TimelineItemType[];
@@ -58,12 +59,15 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const previousDatesLengthRef = useRef<number>(0);
     const [focusTooltipText, setFocusTooltipText] = useState<string>('');
 
+
+    // Estados para o ponto focal
     const [focusPoint, setFocusPoint] = useState<Date | null>(null);
     const [focusIndicatorVisible, setFocusIndicatorVisible] = useState(false);
     const [focusIndicatorPosition, setFocusIndicatorPosition] = useState(0);
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
+    // Ordenar itens e definir datas iniciais
     const sortedItems = [...items].sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
     const initialMinDate = sortedItems.length > 0 ? parseISO(sortedItems[0].start) : new Date();
     const initialMaxDate = sortedItems.length > 0 ? parseISO(sortedItems[sortedItems.length - 1].end) : new Date();
@@ -71,6 +75,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const currentMaxDate = dynamicMaxDate || initialMaxDate;
     const timelineDates = getTimelineDates(currentMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
 
+    // Definir largura fixa das colunas com base no nível de zoom
     const getFixedColumnWidth = (): number => {
         switch (zoomLevel) {
             case 'day': return 60;
@@ -83,106 +88,107 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const columnWidth = getFixedColumnWidth();
     const totalGridWidth = columnWidth * timelineDates.length;
 
+    // Atribuir lanes aos itens
     useEffect(() => {
         setItemsWithLanes(assignLanes(items));
     }, [items]);
 
-    // Função para obter a data exata em uma posição X
+    // Função para identificar a data na posição do clique
+    // Função para identificar a data na posição do clique com precisão proporcional
     const getDateAtPosition = (x: number): Date => {
         if (!containerRef.current) return new Date();
 
         const containerRect = containerRef.current.getBoundingClientRect();
         const relativeX = x - containerRect.left + containerRef.current.scrollLeft;
 
-        const gridStartDate = addDays(currentMinDate, -paddingDaysBefore);
-
         switch (zoomLevel) {
             case 'day':
-                const dayIndex = Math.floor(relativeX / columnWidth);
-                return addDays(gridStartDate, dayIndex);
+                const dayColumnIndex = Math.floor(relativeX / columnWidth);
+                const safeDayIndex = Math.max(0, Math.min(dayColumnIndex, timelineDates.length - 1));
+                return timelineDates[safeDayIndex];
 
             case 'week':
-                const weekIndex = Math.floor(relativeX / columnWidth);
-                const weekStartDate = addWeeks(gridStartDate, weekIndex);
-                // Calcular a posição relativa dentro da semana
-                const positionInsideWeek = (relativeX % columnWidth) / columnWidth;
-                const daysToAdd = Math.floor(positionInsideWeek * 7);
-                return addDays(weekStartDate, daysToAdd);
+                const weekColumnIndex = Math.floor(relativeX / columnWidth);
+                const safeWeekIndex = Math.max(0, Math.min(weekColumnIndex, timelineDates.length - 1));
+                const weekStartDate = startOfWeek(timelineDates[safeWeekIndex], { weekStartsOn: 1 });
+
+                const positionInWeek = relativeX - (weekColumnIndex * columnWidth);
+                const proportionInWeek = positionInWeek / columnWidth;
+                const dayOfWeekFloat = proportionInWeek * 7;
+                const dayOfWeek = Math.floor(dayOfWeekFloat);
+                return addDays(weekStartDate, Math.min(dayOfWeek, 6));
 
             case 'month':
-                const monthIndex = Math.floor(relativeX / columnWidth);
-                const monthStartDate = addMonths(gridStartDate, monthIndex);
-                // Calcular a posição relativa dentro do mês
-                const daysInMonth = new Date(monthStartDate.getFullYear(), monthStartDate.getMonth() + 1, 0).getDate();
-                const positionInsideMonth = (relativeX % columnWidth) / columnWidth;
-                const daysToAddInMonth = Math.floor(positionInsideMonth * daysInMonth);
-                return addDays(monthStartDate, daysToAddInMonth);
+                const monthColumnIndex = Math.floor(relativeX / columnWidth);
+                const safeMonthIndex = Math.max(0, Math.min(monthColumnIndex, timelineDates.length - 1));
+                const monthStartDate = startOfMonth(timelineDates[safeMonthIndex]);
+                const daysInMonth = new Date(
+                    monthStartDate.getFullYear(),
+                    monthStartDate.getMonth() + 1,
+                    0
+                ).getDate();
+
+                const positionInMonth = relativeX - (monthColumnIndex * columnWidth);
+                const proportionInMonth = positionInMonth / columnWidth;
+                const dayOfMonthFloat = proportionInMonth * daysInMonth;
+                const dayOfMonth = Math.floor(dayOfMonthFloat) + 1;
+                return new Date(
+                    monthStartDate.getFullYear(),
+                    monthStartDate.getMonth(),
+                    Math.min(dayOfMonth, daysInMonth)
+                );
 
             default:
                 return new Date();
         }
     };
 
-    // Função para calcular a posição do indicador com precisão diária
-    // Função para calcular a posição do indicador com precisão diária
-    const calculateIndicatorPosition = (date: Date): number => {
-        const gridStartDate = addDays(currentMinDate, -paddingDaysBefore);
+
+    // Função para calcular a posição exata do indicador, independente do zoom
+    const calculateFocusIndicatorPosition = (date: Date): number => {
+        if (!date) return 0;
+
+        let position = 0;
 
         switch (zoomLevel) {
             case 'day':
-                // No modo dia, cada coluna representa um dia
-                // Calcular a posição e centralizar no meio da coluna do dia
-                const daysFromStart = differenceInCalendarDays(date, gridStartDate);
-                return (daysFromStart * columnWidth) + (columnWidth / 2);
+                const dayIndex = timelineDates.findIndex(d =>
+                    format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                );
+                position = dayIndex >= 0 ? dayIndex * columnWidth + columnWidth / 2 : 0;
+                break;
 
             case 'week':
-                // No modo semana, calcular qual semana e posição dentro da semana
-                const startOfFirstWeek = startOfWeek(gridStartDate, { locale: ptBR, weekStartsOn: 1 });
-                const totalDaysFromWeekStart = differenceInCalendarDays(date, startOfFirstWeek);
-                const weekIndex = Math.floor(totalDaysFromWeekStart / 7);
-                const dayInWeek = totalDaysFromWeekStart % 7;
+                const weekStartDate = startOfWeek(date, { weekStartsOn: 1 });
+                const weekIndex = timelineDates.findIndex(d =>
+                    format(startOfWeek(d, { weekStartsOn: 1 }), 'yyyy-MM-dd') ===
+                    format(weekStartDate, 'yyyy-MM-dd')
+                );
 
-                // Posição da semana + posição proporcional do dia dentro da semana
-                return (weekIndex * columnWidth) + ((dayInWeek / 7) * columnWidth);
+                if (weekIndex >= 0) {
+                    const dayInWeek = differenceInCalendarDays(date, weekStartDate);
+                    position = weekIndex * columnWidth + (dayInWeek / 7) * columnWidth;
+                }
+                break;
 
             case 'month':
-                // No modo mês, encontrar em qual mês o dia cai e sua posição proporcional
-                let currentDate = new Date(gridStartDate);
-                let totalPosition = 0;
-                let found = false;
+                const monthStart = startOfMonth(date);
+                const monthIndex = timelineDates.findIndex(d =>
+                    format(d, 'yyyy-MM') === format(date, 'yyyy-MM')
+                );
 
-                while (!found) {
-                    const currentMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1);
-                    const nextMonthStart = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-
-                    // Se a data estiver neste mês
-                    if (date >= currentMonthStart && date < nextMonthStart) {
-                        const daysInMonth = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate();
-                        const dayOfMonth = date.getDate();
-                        const proportionalPosition = (dayOfMonth - 1) / daysInMonth;
-
-                        // Adicionar a posição proporcional do dia dentro do mês
-                        totalPosition += proportionalPosition * columnWidth;
-                        found = true;
-                    } else {
-                        // Avançar para o próximo mês
-                        if (date > nextMonthStart) {
-                            totalPosition += columnWidth;
-                            currentDate = nextMonthStart;
-                        } else {
-                            // A data é anterior ao início da timeline
-                            return 0;
-                        }
-                    }
+                if (monthIndex >= 0) {
+                    const dayOfMonth = date.getDate() - 1;
+                    const daysInMonth = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                    position = monthIndex * columnWidth + (dayOfMonth / daysInMonth) * columnWidth;
                 }
-
-                return totalPosition;
-
-            default:
-                return 0;
+                break;
         }
+
+        return position;
     };
 
+// Handler para duplo clique para definir ponto focal
     const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('.timeline-item')) return;
 
@@ -191,13 +197,14 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setFocusIndicatorVisible(true);
 
         const formattedDate = format(exactDate, 'dd/MM/yyyy');
-        setFocusTooltipText(formattedDate);
-        console.log(`Ponto focal definido: ${formattedDate}`);
+        const dayName = format(exactDate, 'EEEE', { locale: ptBR });
+        setFocusTooltipText(`${formattedDate} (${dayName})`);
 
-        const indicatorPosition = calculateIndicatorPosition(exactDate);
+        const indicatorPosition = calculateFocusIndicatorPosition(exactDate);
         setFocusIndicatorPosition(indicatorPosition);
     };
 
+    // Funções de expansão
     const expandMinDate = (currentMin: Date, steps: number = 20) => {
         switch (zoomLevel) {
             case 'day': return subDays(currentMin, steps);
@@ -216,6 +223,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         }
     };
 
+
+
+    // Configurar o IntersectionObserver para lazy loading
     useEffect(() => {
         if (!containerRef.current) return;
 
@@ -227,16 +237,16 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             const previousLength = timelineDates.length;
                             const newMinDate = expandMinDate(currentMinDate);
                             const newDates = getTimelineDates(newMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
+                            const addedColumns = newDates.length - previousLength;
+                            const scrollAdjustment = addedColumns * columnWidth;
 
-                            // Primeiro, salvar o ponto focal atual
+                            // Recalcular a posição do indicador focal após a expansão
                             if (focusPoint && focusIndicatorVisible) {
-                                // Manter a data focal e recalcular sua posição após a expansão
-                                setTimeout(() => {
-                                    const newPosition = calculateIndicatorPosition(focusPoint);
-                                    setFocusIndicatorPosition(newPosition);
-                                }, 10);
+                                setFocusIndicatorPosition(prevPosition => prevPosition + scrollAdjustment);
                             }
 
+                            // Ajustar o scroll antes de atualizar o estado
+                            containerRef.current!.scrollLeft += scrollAdjustment;
                             setDynamicMinDate(newMinDate);
                             previousDatesLengthRef.current = newDates.length;
                         } else if (entry.target.id === 'sentinel-right') {
@@ -246,7 +256,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     }
                 });
             },
-            { root: containerRef.current, threshold: 0, rootMargin: '0px 0px 0px 200px' }
+            {
+                root: containerRef.current,
+                threshold: 0,
+                rootMargin: '0px 0px 0px 200px',
+            }
         );
 
         const leftSentinel = document.getElementById('sentinel-left');
@@ -257,6 +271,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return () => observer.disconnect();
     }, [currentMinDate, currentMaxDate, zoomLevel, timelineDates, columnWidth, focusPoint, focusIndicatorVisible]);
 
+    // Manipulação de eventos de arrastar
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
         if (isItemModalOpen || (e.target as HTMLElement).closest('.timeline-item')) return;
         setIsDragging(true);
@@ -282,6 +297,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return () => window.removeEventListener('mouseup', handleMouseUp);
     }, []);
 
+    // Manipulação de zoom com roda do mouse
     const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
         if (e.altKey) {
             e.preventDefault();
@@ -291,22 +307,24 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             newIndex = Math.max(0, Math.min(newIndex, zoomLevels.length - 1));
             const newZoomLevel = zoomLevels[newIndex];
 
-            setZoomLevel(newZoomLevel);
-            if (!focusPoint || !focusIndicatorVisible) {
+            if (focusPoint && focusIndicatorVisible && containerRef.current) {
+                // Salvar ponto focal atual antes de mudar o zoom
+                setZoomLevel(newZoomLevel);
+            } else {
+                // Comportamento padrão sem ponto focal
+                setZoomLevel(newZoomLevel);
                 setDynamicMinDate(null);
                 setDynamicMaxDate(null);
             }
         }
     };
 
-    // Efeito para recalcular a posição do indicador quando o zoom muda
+    // Efeito para recentralizar após mudança de zoom
     useEffect(() => {
         if (focusPoint && containerRef.current && focusIndicatorVisible) {
-            // Recalcular posição do indicador com a nova escala de zoom
-            const newPosition = calculateIndicatorPosition(focusPoint);
+            const newPosition = calculateFocusIndicatorPosition(focusPoint);
             setFocusIndicatorPosition(newPosition);
 
-            // Centralizar a visualização no ponto focal
             const containerWidth = containerRef.current.clientWidth;
             const targetScroll = newPosition - containerWidth / 2;
 
@@ -317,10 +335,12 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         behavior: 'smooth'
                     });
                 }
-            }, 10);
+            }, 0);
         }
     }, [zoomLevel, focusPoint, timelineDates, columnWidth, focusIndicatorVisible]);
 
+
+    // Manipulação de arrastar itens
     const handleDragEnd = (event: DragEndEvent) => {
         if (isItemModalOpen) return;
         const { active, delta } = event;
@@ -365,6 +385,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setItemsWithLanes(assignLanes(updatedItems));
     };
 
+    // Renderização
     const maxLane = Math.max(...itemsWithLanes.map((item) => item.lane || 0), 0);
     const activeLanes = Array.from({ length: maxLane + 1 }, (_, i) => i);
     const totalGridHeight = activeLanes.length * 60;
@@ -446,6 +467,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                     <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
                         Mês
                     </ZoomButton>
+
                     <button
                         onClick={() => setFocusIndicatorVisible(false)}
                         disabled={!focusIndicatorVisible}
@@ -501,11 +523,60 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                                     height: `${totalGridHeight}px`
                                 }} />
 
+                                {/* Indicador de Ponto Focal */}
                                 {focusIndicatorVisible && (
-                                    <FocusIndicator
-                                        left={focusIndicatorPosition}
-                                        isActive={focusIndicatorVisible}
-                                    />
+                                    <div
+                                        style={{
+                                            position: 'absolute',
+                                            left: `${focusIndicatorPosition}px`,
+                                            top: '0',
+                                            height: '100%',
+                                            width: '2px',
+                                            backgroundColor: '#ff6b6b',
+                                            zIndex: 10,
+                                            opacity: focusIndicatorVisible ? 0.8 : 0,
+                                            transition: 'opacity 0.3s ease',
+                                            boxShadow: '0 0 8px rgba(255, 107, 107, 0.8)'
+                                        }}
+                                    >
+                                        {/* Tooltip com a data exata */}
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '-40px',
+                                                left: '-50px',
+                                                width: '120px',
+                                                backgroundColor: '#333',
+                                                color: 'white',
+                                                borderRadius: '4px',
+                                                padding: '4px 8px',
+                                                fontSize: '12px',
+                                                textAlign: 'center',
+                                                opacity: 1,
+                                                transition: 'opacity 0.2s ease',
+                                                pointerEvents: 'none',
+                                                zIndex: 20,
+                                                whiteSpace: 'nowrap',
+                                                fontWeight: 'bold'
+                                            }}
+                                        >
+                                            {focusTooltipText}
+                                        </div>
+
+                                        {/* Marcador circular */}
+                                        <div
+                                            style={{
+                                                position: 'absolute',
+                                                top: '-10px',
+                                                left: '-5px',
+                                                width: '12px',
+                                                height: '12px',
+                                                backgroundColor: '#ff6b6b',
+                                                borderRadius: '50%',
+                                                boxShadow: '0 0 8px rgba(255, 107, 107, 0.8)'
+                                            }}
+                                        />
+                                    </div>
                                 )}
 
                                 {activeLanes.map((laneId) =>
