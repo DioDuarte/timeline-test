@@ -88,6 +88,7 @@ export const DateHeaderContainer = styled.div`
   flex-direction: column;
   overflow: visible;
   position: relative;
+  margin-left: 2px;
 
   .date-row {
     display: flex;
