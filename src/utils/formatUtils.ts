@@ -3,9 +3,7 @@ import {
     format,
     parse,
     isValid,
-    startOfWeek,
-    endOfWeek,
-    Locale,
+    Locale, startOfWeek, endOfWeek,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { ZoomLevel } from '../types/types';
@@ -40,22 +38,24 @@ export function parseDate(dateString: string): Date {
  * @param locale - The locale to use for formatting (defaults to ptBR)
  * @returns A formatted string suitable for the timeline header
  */
-export function formatTimelineHeaderDate(
-    date: Date,
-    zoomLevel: ZoomLevel,
-    locale: Locale = ptBR
-): string {
+export const formatTimelineHeaderDate = (date: Date, zoomLevel: ZoomLevel, locale: Locale): string => {
+    const isPortuguese = locale === ptBR; // Verifica se o locale é ptBR
+    const dateFormat = isPortuguese ? 'dd/MM' : 'MM/dd'; // Define o formato correto por idioma
+
     switch (zoomLevel) {
         case 'day':
-            return format(date, 'dd/MM/yy');
-        case 'week':
-            return `${format(startOfWeek(date, { locale, weekStartsOn: 1 }), 'dd/MM')} - ${format(endOfWeek(date, { locale, weekStartsOn: 1 }), 'dd/MM')}`;
+            return format(date, dateFormat, { locale });
+        case 'week': {
+            const start = startOfWeek(date, { locale, weekStartsOn: 1 }); // Segunda-feira como início
+            const end = endOfWeek(date, { locale, weekStartsOn: 1 });     // Domingo como fim
+            return `${format(start, dateFormat, { locale })} - ${format(end, dateFormat, { locale })}`;
+        }
         case 'month':
-            return format(date, 'MMM yyyy', { locale });
+            return format(date, 'MMMM yyyy', { locale });
         default:
-            return '';
+            return format(date, dateFormat, { locale }); // Padrão
     }
-}
+};
 
 /**
  * Formats a date for display in a tooltip or detailed view
@@ -63,9 +63,9 @@ export function formatTimelineHeaderDate(
  * @param locale - The locale to use for formatting (defaults to ptBR)
  * @returns A string in the format 'dd/MM/yyyy (EEEE)'
  */
-export function formatDetailedDate(date: Date, locale: Locale = ptBR): string {
-    return `${format(date, 'dd/MM/yyyy')} (${format(date, 'EEEE', { locale })})`;
-}
+export const formatDetailedDate = (date: Date, locale: Locale): string => {
+    return format(date, 'PPPP', { locale });
+};
 
 /**
  * Formats a day of the week for sub-labels (e.g., in 'day' zoom level)
@@ -73,6 +73,6 @@ export function formatDetailedDate(date: Date, locale: Locale = ptBR): string {
  * @param locale - The locale to use for formatting (defaults to ptBR)
  * @returns A string with the abbreviated day of the week (e.g., 'Seg')
  */
-export function formatDayOfWeek(date: Date, locale: Locale = ptBR): string {
+export const formatDayOfWeek = (date: Date, locale: Locale): string => {
     return format(date, 'EEE', { locale });
-}
+};

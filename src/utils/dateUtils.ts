@@ -11,6 +11,7 @@ import React from "react";
 import { ptBR } from 'date-fns/locale';
 
 
+
 /**
  * Returns a list of dates for the timeline header based on the date range and zoom level
  */

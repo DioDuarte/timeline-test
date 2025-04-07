@@ -2,6 +2,7 @@ import React from 'react';
 import { ZoomLevel } from '../../types/types';
 import { formatTimelineHeaderDate, formatDayOfWeek } from '../../utils/formatUtils';
 import { TimelineHeader, DateHeaderContainer, DateHeaderCell } from './styles';
+import { useLocalization } from '../../context/LocalizationContext';
 
 interface TimelineHeaderProps {
     timelineDates: Date[];
@@ -14,6 +15,7 @@ const TimelineHeaderComponent: React.FC<TimelineHeaderProps> = ({
                                                                     zoomLevel,
                                                                     columnWidth,
                                                                 }) => {
+    const { locale } = useLocalization();
     const totalGridWidth = columnWidth * timelineDates.length;
 
     return (
@@ -27,9 +29,9 @@ const TimelineHeaderComponent: React.FC<TimelineHeaderProps> = ({
                             isLast={index === timelineDates.length - 1}
                             isWeekend={date.getDay() === 0 || date.getDay() === 6}
                         >
-                            {formatTimelineHeaderDate(date, zoomLevel)}
+                            {formatTimelineHeaderDate(date, zoomLevel, locale)}
                             {zoomLevel === 'day' && (
-                                <span className="day-of-week">{formatDayOfWeek(date)}</span>
+                                <span className="day-of-week">{formatDayOfWeek(date, locale)}</span>
                             )}
                         </DateHeaderCell>
                     ))}

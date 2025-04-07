@@ -1,6 +1,7 @@
 import React from 'react';
 import { ZoomLevel } from '../../types/types';
 import { TimelineControls, ZoomButton } from './styles';
+import { useLocalization } from '../../context/LocalizationContext';
 
 interface TimelineControlsProps {
     zoomLevel: ZoomLevel;
@@ -15,16 +16,18 @@ const TimelineControlsComponent: React.FC<TimelineControlsProps> = ({
                                                                         focusIndicatorVisible,
                                                                         onRemoveFocus,
                                                                     }) => {
+    const { t } = useLocalization();
+
     return (
         <TimelineControls>
             <ZoomButton active={zoomLevel === 'day'} onClick={() => setZoomLevel('day')}>
-                Dia
+                {t('day')}
             </ZoomButton>
             <ZoomButton active={zoomLevel === 'week'} onClick={() => setZoomLevel('week')}>
-                Semana
+                {t('week')}
             </ZoomButton>
             <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
-                Mês
+                {t('month')}
             </ZoomButton>
             <button
                 onClick={onRemoveFocus}
@@ -40,7 +43,7 @@ const TimelineControlsComponent: React.FC<TimelineControlsProps> = ({
                     cursor: focusIndicatorVisible ? 'pointer' : 'default',
                 }}
             >
-                Remover Ponto de Referência
+                {t('removeReferencePoint')}
             </button>
         </TimelineControls>
     );

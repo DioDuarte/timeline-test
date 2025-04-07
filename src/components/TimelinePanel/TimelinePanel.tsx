@@ -1,8 +1,10 @@
+import {useLocalization} from "../../context/LocalizationContext";
 import React, {useState} from 'react';
 import { TimelineItem as TimelineItemType } from '../../types/types';
 import { format, parseISO } from 'date-fns';
 import { ItemsPanel, ItemCard, ItemTitle, ItemDates } from './styles';
 import { useSyncHeight } from '../../hooks/useSyncHeight';
+import {ptBR} from "date-fns/locale";
 
 interface ItemsListPanelProps {
     items: TimelineItemType[];
@@ -22,6 +24,8 @@ const ItemsListPanel: React.FC<ItemsListPanelProps> = ({
 
     const panelHeight = useSyncHeight(timelineRef);
     const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+    const { locale } = useLocalization();
+    const dateFormat = locale === ptBR ? 'dd/MM/yyyy' : 'MM/dd/yyyy';
 
     return (
         <ItemsPanel style={{height: panelHeight}}>
@@ -43,7 +47,7 @@ const ItemsListPanel: React.FC<ItemsListPanelProps> = ({
                     >
                         <ItemTitle>{item.name}</ItemTitle>
                         <ItemDates>
-                            {format(parseISO(item.start), 'dd/MM/yyyy')} - {format(parseISO(item.end), 'dd/MM/yyyy')}
+                            {format(parseISO(item.start), dateFormat, {locale})} - {format(parseISO(item.end), dateFormat, {locale})}
                         </ItemDates>
                     </ItemCard>
                 ))}

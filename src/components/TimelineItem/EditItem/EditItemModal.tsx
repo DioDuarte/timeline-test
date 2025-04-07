@@ -1,3 +1,4 @@
+import { useLocalization } from '../../../context/LocalizationContext';
 import React, { useState, useEffect } from 'react';
 import { format, parseISO } from 'date-fns';
 import {
@@ -26,6 +27,7 @@ interface EditItemModalProps {
 }
 
 export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onClose }) => {
+    const { t, locale } = useLocalization();
     const [name, setName] = useState(item.name);
     const [startDate, setStartDate] = useState(format(parseISO(item.start), 'yyyy-MM-dd'));
     const [endDate, setEndDate] = useState(format(parseISO(item.end), 'yyyy-MM-dd'));
@@ -59,16 +61,14 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
                 <ModalHeader>
                     <ModalTitle>
                         {FiEdit2({ size: 16, style: { marginRight: '8px' } })}
-                        Editar Item
+                        {t('editItem')}
                     </ModalTitle>
-                    <CloseButton onClick={onClose}>
-                        {FiX({ size: 18 })}
-                    </CloseButton>
+                    <CloseButton onClick={onClose}>{FiX({ size: 18 })}</CloseButton>
                 </ModalHeader>
 
-                <ModalBody style={{width: '100%', height: '100%'}}>
+                <ModalBody style={{ width: '100%', height: '100%' }}>
                     <InputField>
-                        <label htmlFor="item-name">Nome do Item</label>
+                        <label htmlFor="item-name">{t('itemName')}</label>
                         <input
                             id="item-name"
                             type="text"
@@ -82,7 +82,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
                     <InputField>
                         <label htmlFor="start-date">
                             {FiCalendar({ size: 16, style: { marginRight: '6px' } })}
-                            Data de Início
+                            {t('startDate')}
                         </label>
                         <DateInput
                             id="start-date"
@@ -96,7 +96,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
                     <InputField>
                         <label htmlFor="end-date">
                             {FiCalendar({ size: 16, style: { marginRight: '6px' } })}
-                            Data de Fim
+                            {t('endDate')}
                         </label>
                         <DateInput
                             id="end-date"
@@ -111,10 +111,10 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
 
                 <ModalFooter>
                     <Button type="button" onClick={onClose}>
-                        {FiX({ size: 16 })} Cancelar
+                        {FiX({ size: 16 })} {t('cancel')}
                     </Button>
                     <Button type="button" primary onClick={handleSave}>
-                        {FiSave({ size: 16 })} Salvar Alterações
+                        {FiSave({ size: 16 })} {t('saveChanges')}
                     </Button>
                 </ModalFooter>
             </ModalContent>

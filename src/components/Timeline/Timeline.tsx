@@ -1,12 +1,7 @@
+import { useLocalization } from "../../context/LocalizationContext";
 import React, { useState, useEffect, useRef } from 'react';
 import { format, parseISO, startOfWeek } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
-import {
-    TimelineContainer,
-    ScrollContainer,
-    TimelineBody,
-    TimelineWrapper,
-} from './styles';
+import { TimelineContainer, ScrollContainer, TimelineBody, TimelineWrapper } from './styles';
 import { TimelineItem as TimelineItemType } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
 import { useTimelineConfig } from '../../context/TimelineContext';
@@ -15,58 +10,41 @@ import {
     expandMaxDate,
     expandMinDate,
     getDateAtPosition,
-    getTimelineDates
+    getTimelineDates,
 } from '../../utils/dateUtils';
 import { formatDetailedDate } from '../../utils/formatUtils';
 import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
-import ItemsListPanel from "../TimelinePanel/TimelinePanel";
+import ItemsListPanel from '../TimelinePanel/TimelinePanel';
 import { DragEndEvent } from '@dnd-kit/core';
-import { useZoomControl } from "../../hooks/useZoomControl";
-import { useDragScroll } from "../../hooks/useDragScroll";
-import { getFixedColumnWidth, handleItemDragEnd } from "../../utils/timelineUtils";
-import TimelineControlsComponent from "./TimelineControls";
-import TimelineHeaderComponent from "./TimeLineHeader";
-import TimelineGridComponent from "./TimelineGrid";
-import TimelineInstructions from "./TimelineInstructions";
+import { useDragScroll } from '../../hooks/useDragScroll';
+import { useZoomControl } from '../../hooks/useZoomControl';
+import { getFixedColumnWidth, handleItemDragEnd } from '../../utils/timelineUtils';
+import TimelineControlsComponent from './TimelineControls';
+import TimelineHeaderComponent from './TimeLineHeader';
+import TimelineGridComponent from './TimelineGrid';
+import TimelineInstructions from './TimelineInstructions';
 
-interface TimelineProps {
+export interface TimelineProps {
     items: TimelineItemType[];
 }
 
 const Timeline: React.FC<TimelineProps> = ({ items }) => {
-    // ==========================================
-    // 1. Estados e Referências
-    // ==========================================
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
+    const { locale } = useLocalization();
     const containerRef = useRef<HTMLDivElement>(null);
     const previousDatesLengthRef = useRef<number>(0);
 
-    // Estados para itens e datas
     const [itemsWithLanes, setItemsWithLanes] = useState<TimelineItemType[]>([]);
     const [dynamicMinDate, setDynamicMinDate] = useState<Date | null>(null);
     const [dynamicMaxDate, setDynamicMaxDate] = useState<Date | null>(null);
-
-    // Estados para interatividade
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
     const [selectedItemId, setSelectedItemId] = useState<number | undefined>();
     const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
-
-    // Estados para o ponto focal
     const [focusPoint, setFocusPoint] = useState<Date | null>(null);
     const [focusIndicatorVisible, setFocusIndicatorVisible] = useState(false);
     const [focusIndicatorPosition, setFocusIndicatorPosition] = useState(0);
     const [focusTooltipText, setFocusTooltipText] = useState<string>('');
 
-    // Hooks customizados
-    const { isDragging, setIsDragging, handleMouseDown, handleMouseMove } = useDragScroll(containerRef);
-    const { handleWheel } = useZoomControl(zoomLevel, setZoomLevel, () => {
-        setDynamicMinDate(null);
-        setDynamicMaxDate(null);
-    });
-
-    // ==========================================
-    // 2. Constantes e Variáveis Derivadas
-    // ==========================================
     const sortedItems = [...items].sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
     const initialMinDate = sortedItems.length > 0 ? parseISO(sortedItems[0].start) : new Date();
     const initialMaxDate = sortedItems.length > 0 ? parseISO(sortedItems[sortedItems.length - 1].end) : new Date();
@@ -76,20 +54,29 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const columnWidth = getFixedColumnWidth(zoomLevel);
     const totalGridWidth = columnWidth * timelineDates.length;
 
-    // Cálculos de altura da grid
     const maxLane = Math.max(...itemsWithLanes.map((item) => item.lane || 0), 0);
     const activeLanes = Array.from({ length: maxLane + 1 }, (_, i) => i);
     const totalGridHeight = activeLanes.length * 60;
 
-    // ==========================================
-    // 3. Manipuladores de Eventos
-    // ==========================================
+    const { isDragging, setIsDragging, handleMouseDown, handleMouseMove } = useDragScroll(containerRef);
 
-    // Manipular duplo clique para definir/remover ponto focal
+    // Use the zoom control hook
+    const { handleWheel, handleZoomChange } = useZoomControl(
+        zoomLevel,
+        setZoomLevel,
+        setDynamicMinDate,
+        setDynamicMaxDate,
+        timelineDates,
+        columnWidth,
+        containerRef,
+        items // Pass items for centering on first item during direct zoom
+    );
+
+
+
     const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('.timeline-item')) return;
 
-        // Remover ponto focal se o clique for perto dele
         if (focusIndicatorVisible && containerRef.current) {
             const containerRect = containerRef.current.getBoundingClientRect();
             const clickPosition = e.clientX - containerRect.left + containerRef.current.scrollLeft;
@@ -101,20 +88,17 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             }
         }
 
-        // Criar novo ponto focal
         const exactDate = getDateAtPosition(e.clientX, timelineDates, columnWidth, zoomLevel, containerRef);
         setFocusPoint(exactDate);
         setFocusIndicatorVisible(true);
-        setFocusTooltipText(formatDetailedDate(exactDate));
+        setFocusTooltipText(formatDetailedDate(exactDate, locale));
         setFocusIndicatorPosition(calculateFocusIndicatorPosition(exactDate, timelineDates, zoomLevel, columnWidth));
     };
 
-    // Finalizar arrasto quando soltar o mouse
     const handleMouseUp = () => {
         setIsDragging(false);
     };
 
-    // Manipular fim de arrasto de item
     const handleDragEnd = (event: DragEndEvent) => {
         if (isItemModalOpen) return;
         handleItemDragEnd(event, itemsWithLanes, timelineDates, columnWidth, zoomLevel, setItemsWithLanes, (start, end) => {
@@ -123,29 +107,23 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         });
     };
 
-    // ==========================================
-    // 4. Funções Auxiliares
-    // ==========================================
-
-    // Localizar índice de uma data na timeline
     const findDateIndex = (date: Date) => {
         switch (zoomLevel) {
             case 'day':
-                return timelineDates.findIndex((d) => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
+                return timelineDates.findIndex((d) => format(d, 'yyyy-MM-dd', { locale }) === format(date, 'yyyy-MM-dd', { locale }));
             case 'week':
                 return timelineDates.findIndex((d) => {
-                    const weekStart = startOfWeek(d, { locale: ptBR, weekStartsOn: 1 });
-                    const itemWeekStart = startOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
-                    return format(weekStart, 'yyyy-MM-dd') === format(itemWeekStart, 'yyyy-MM-dd');
+                    const weekStart = startOfWeek(d, { locale, weekStartsOn: 1 });
+                    const itemWeekStart = startOfWeek(date, { locale, weekStartsOn: 1 });
+                    return format(weekStart, 'yyyy-MM-dd', { locale }) === format(itemWeekStart, 'yyyy-MM-dd', { locale });
                 });
             case 'month':
-                return timelineDates.findIndex((d) => format(d, 'yyyy-MM') === format(date, 'yyyy-MM'));
+                return timelineDates.findIndex((d) => format(d, 'yyyy-MM', { locale }) === format(date, 'yyyy-MM', { locale }));
             default:
                 return -1;
         }
     };
 
-    // Rolar para um item específico
     const scrollToItem = (item: TimelineItemType) => {
         setSelectedItemId(item.id);
 
@@ -159,7 +137,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         const startIndex = findDateIndex(itemStart);
         const endIndex = findDateIndex(itemEnd);
 
-        // Se o item não estiver visível na timeline atual, ajustar as datas
         if (startIndex === -1 || endIndex === -1) {
             const newMinDate = itemStart < timelineDates[0] ? itemStart : timelineDates[0];
             const newMaxDate = itemEnd > timelineDates[timelineDates.length - 1] ? itemEnd : timelineDates[timelineDates.length - 1];
@@ -168,7 +145,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             return;
         }
 
-        // Calcular posição e centralizar item na viewport
         const itemStartPixel = startIndex * columnWidth;
         const itemWidth = (endIndex - startIndex + 1) * columnWidth;
         const itemCenterPixel = itemStartPixel + (itemWidth / 2);
@@ -182,20 +158,14 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
         containerRef.current.scrollTo({
             left: targetScroll,
-            behavior
+            behavior,
         });
     };
 
-    // ==========================================
-    // 5. Efeitos Secundários
-    // ==========================================
-
-    // Atribuir lanes aos itens
     useEffect(() => {
         setItemsWithLanes(assignLanes(items));
     }, [items]);
 
-    // Configurar IntersectionObserver para lazy loading
     useEffect(() => {
         if (!containerRef.current) return;
 
@@ -210,12 +180,10 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             const addedColumns = newDates.length - previousLength;
                             const scrollAdjustment = addedColumns * columnWidth;
 
-                            // Recalcular posição do indicador focal após expansão
                             if (focusPoint && focusIndicatorVisible) {
-                                setFocusIndicatorPosition(prevPosition => prevPosition + scrollAdjustment);
+                                setFocusIndicatorPosition((prevPosition) => prevPosition + scrollAdjustment);
                             }
 
-                            // Ajustar scroll antes de atualizar o estado
                             containerRef.current!.scrollLeft += scrollAdjustment;
                             setDynamicMinDate(newMinDate);
                             previousDatesLengthRef.current = newDates.length;
@@ -241,13 +209,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         return () => observer.disconnect();
     }, [currentMinDate, currentMaxDate, zoomLevel, timelineDates, columnWidth, focusPoint, focusIndicatorVisible]);
 
-    // Adicionar listener global para mouseup
     useEffect(() => {
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
     }, []);
 
-    // Recentralizar após mudança de zoom
     useEffect(() => {
         if (focusPoint && containerRef.current && focusIndicatorVisible) {
             const newPosition = calculateFocusIndicatorPosition(focusPoint, timelineDates, zoomLevel, columnWidth);
@@ -256,30 +222,22 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
             const containerWidth = containerRef.current.clientWidth;
             const targetScroll = newPosition - containerWidth / 2;
 
-            setTimeout(() => {
-                if (containerRef.current) {
-                    containerRef.current.scrollTo({
-                        left: Math.max(0, targetScroll),
-                        behavior: 'smooth'
-                    });
-                }
-            }, 0);
+            containerRef.current.scrollTo({
+                left: Math.max(0, targetScroll),
+                behavior: 'smooth',
+            });
         }
     }, [zoomLevel, focusPoint, timelineDates, columnWidth, focusIndicatorVisible]);
 
-    // ==========================================
-    // 6. Renderização
-    // ==========================================
     return (
         <TimelineWrapper>
             <TimelineContainer>
                 <TimelineControlsComponent
                     zoomLevel={zoomLevel}
-                    setZoomLevel={setZoomLevel}
+                    setZoomLevel={handleZoomChange}
                     focusIndicatorVisible={focusIndicatorVisible}
                     onRemoveFocus={() => setFocusIndicatorVisible(false)}
                 />
-
                 <ScrollContainer
                     ref={containerRef}
                     onWheel={handleWheel}
@@ -293,7 +251,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                         zoomLevel={zoomLevel}
                         columnWidth={columnWidth}
                     />
-
                     <TimelineBody>
                         <TimelineGridComponent
                             isItemModalOpen={isItemModalOpen}
@@ -314,15 +271,13 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             onDragEnd={handleDragEnd}
                         />
                     </TimelineBody>
-
                     <ScrollArrows
                         scrollContainerRef={containerRef}
                         totalGridWidth={totalGridWidth}
                     />
                 </ScrollContainer>
-                <TimelineInstructions/>
+                <TimelineInstructions />
             </TimelineContainer>
-
             <ItemsListPanel
                 items={itemsWithLanes}
                 selectedItemId={selectedItemId}

@@ -1,4 +1,5 @@
 // src/components/TimelineItem/TimelineItem.tsx
+import {useLocalization} from "../../context/LocalizationContext";
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import { ItemContainer, ItemContent } from './styles';
 import { TimelineItem as TimelineItemType } from '../../types/types';
@@ -8,6 +9,7 @@ import { useTimelineConfig } from '../../context/TimelineContext';
 import { useDraggable } from '@dnd-kit/core';
 import { EditItemModal } from './EditItem/EditItemModal';
 import {assignLanes} from "../../utils/assignLanes";
+import {ptBR} from "date-fns/locale";
 
 interface TimelineItemProps {
     item: TimelineItemType;
@@ -40,6 +42,8 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
     const [isDragging, setIsDragging] = useState(false);
     const [hasEnoughSpace, setHasEnoughSpace] = useState(false);
     const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
+    const { locale } = useLocalization();
+    const dateFormat = locale === ptBR ? 'dd/MM' : 'MM/dd';
 
     const contentRef = useRef<HTMLDivElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -147,7 +151,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                 <ItemContent ref={contentRef}>
                     {item.name}
                     <div style={{ fontSize: '10px', marginTop: '2px' }}>
-                        {format(startDate, 'dd/MM')} - {format(endDate, 'dd/MM')}
+                        {format(startDate, dateFormat,  {locale})} - {format(endDate, dateFormat, {locale})}
                     </div>
                 </ItemContent>
             </ItemContainer>
