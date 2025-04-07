@@ -15,6 +15,7 @@ interface TimelineGridProps {
     focusTooltipText: string;
     onDragEnd: (event: DragEndEvent) => void;
     setIsItemModalOpen: (isOpen: boolean) => void;
+    isItemModalOpen: boolean;
     currentMinDate: Date;
     currentMaxDate: Date;
     setItemsWithLanes: (items: TimelineItemType[]) => void;
@@ -37,7 +38,8 @@ const TimelineGridComponent: React.FC<TimelineGridProps> = ({
                                                                 currentMaxDate,
                                                                 setItemsWithLanes,
                                                                 hoveredItemId,
-                                                                selectedItemId
+                                                                selectedItemId,
+                                                                isItemModalOpen
                                                             }) => {
     const maxLane = Math.max(...itemsWithLanes.map((item) => item.lane || 0), 0);
     const activeLanes = Array.from({ length: maxLane + 1 }, (_, i) => i);

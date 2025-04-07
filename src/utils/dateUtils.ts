@@ -103,15 +103,6 @@ export function calculateItemPosition(
 
             left = startDiffDays * columnWidth + marginSpace;
             width = itemDurationDays * columnWidth - marginSpace;
-
-            console.log({
-                item: `${startDate.toISOString().slice(0,10)} to ${endDate.toISOString().slice(0,10)}`,
-                startDiffDays,
-                endDiffDays,
-                itemDurationDays,
-                columnWidth,
-                width
-            });
             break;
         }
         case 'week': {

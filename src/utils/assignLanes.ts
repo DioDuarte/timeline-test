@@ -50,6 +50,5 @@ export const assignLanes = (items: TimelineItem[]): TimelineItem[] => {
         });
     });
 
-    console.log('Assigned lanes:', itemsWithLanes);
     return itemsWithLanes;
 };

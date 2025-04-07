@@ -296,6 +296,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
                     <TimelineBody>
                         <TimelineGridComponent
+                            isItemModalOpen={isItemModalOpen}
                             hoveredItemId={hoveredItemId}
                             selectedItemId={selectedItemId}
                             setItemsWithLanes={setItemsWithLanes}

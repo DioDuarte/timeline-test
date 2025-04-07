@@ -108,6 +108,7 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         const updatedItems = items.map((i) => (i.id === item.id ? updated : i));
         onItemChange(assignLanes(updatedItems));
         setIsModalOpen(false);
+        onModalStateChange(false);
     };
 
     const mergeRefs = (...refs: any[]) => (value: any) => {

@@ -55,7 +55,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
 
     return (
         <ModalContainer onClick={onClose}>
-            <ModalContent onClick={handleModalClick}>
+            <ModalContent onClick={handleModalClick} onMouseDown={(e) => e.stopPropagation()}>
                 <ModalHeader>
                     <ModalTitle>
                         {FiEdit2({ size: 16, style: { marginRight: '8px' } })}
