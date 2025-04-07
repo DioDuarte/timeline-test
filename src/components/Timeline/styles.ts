@@ -164,3 +164,29 @@ export const Sentinel = styled.div`
     position: absolute;
     pointer-events: none;
 `;
+
+// Adicione este componente de estilo ao arquivo styles.ts
+export const FocusIndicator = styled.div<{ left: number; isActive: boolean }>`
+  position: absolute;
+  left: ${props => props.left}px;
+  top: 0;
+  height: 100%;
+  width: 2px;
+  background-color: #ff6b6b;
+  z-index: 10;
+  opacity: ${props => (props.isActive ? 0.8 : 0)};
+  transition: opacity 0.3s ease;
+  box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: -10px;
+    left: -5px;
+    width: 12px;
+    height: 12px;
+    background-color: #ff6b6b;
+    border-radius: 50%;
+    box-shadow: 0 0 8px rgba(255, 107, 107, 0.8);
+  }
+`;
