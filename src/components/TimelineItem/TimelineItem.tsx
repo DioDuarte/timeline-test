@@ -1,3 +1,4 @@
+// src/components/TimelineItem/TimelineItem.tsx
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import { ItemContainer, ItemContent } from './styles';
 import { TimelineItem as TimelineItemType } from '../../types/types';
@@ -5,6 +6,8 @@ import { format, parseISO } from 'date-fns';
 import { calculateItemPosition } from '../../utils/dateUtils';
 import { useTimelineConfig } from '../../context/TimelineContext';
 import { useDraggable } from '@dnd-kit/core';
+import { EditItemModal } from './EditItem/EditItemModal';
+import {assignLanes} from "../../utils/assignLanes";
 
 interface TimelineItemProps {
     item: TimelineItemType;
@@ -15,6 +18,9 @@ interface TimelineItemProps {
     columnWidth: number;
     maxLanes: number;
     onItemChange: (items: TimelineItemType[]) => void;
+    onModalStateChange: (isOpen: boolean) => void;
+    isHovered?: boolean;
+    isSelected?: boolean;
 }
 
 const TimelineItem: React.FC<TimelineItemProps> = ({
@@ -25,10 +31,12 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
                                                        totalWidth,
                                                        columnWidth,
                                                        maxLanes,
-                                                       onItemChange
+                                                       onItemChange,
+                                                       onModalStateChange,
+                                                       isHovered,
+                                                       isSelected
                                                    }) => {
-    const [isEditing, setIsEditing] = useState(false);
-    const [editValue, setEditValue] = useState(item.name);
+    const [isModalOpen, setIsModalOpen] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
     const [hasEnoughSpace, setHasEnoughSpace] = useState(false);
     const [dragPosition, setDragPosition] = useState({ x: 0, y: 0 });
@@ -85,32 +93,25 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
 
     const handleDragStart = () => setIsDragging(true);
     const handleDragEnd = () => setIsDragging(false);
-    const handleDoubleClick = () => setIsEditing(true);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        setEditValue(e.target.value);
+    const handleDoubleClick = () => {
+        setIsModalOpen(true);
+        onModalStateChange(true);
     };
 
-    const handleInputBlur = () => {
-        if (editValue.trim()) {
-            const updatedItem = { ...item, name: editValue.trim() };
-            const updatedItems = items.map(i => (i.id === item.id ? updatedItem : i));
-            onItemChange(updatedItems);
-        }
-        setIsEditing(false);
-    };
+    const handleCloseModal = () => {
+        setIsModalOpen(false);
+        onModalStateChange(false);
+    }
 
-    const handleInputKeyDown = (e: React.KeyboardEvent) => {
-        if (e.key === 'Enter') {
-            handleInputBlur();
-        } else if (e.key === 'Escape') {
-            setEditValue(item.name);
-            setIsEditing(false);
-        }
+    const handleSave = (updatedItem: { name: string; start: string; end: string }) => {
+        const updated = { ...item, ...updatedItem };
+        const updatedItems = items.map((i) => (i.id === item.id ? updated : i));
+        onItemChange(assignLanes(updatedItems));
+        setIsModalOpen(false);
     };
 
     const mergeRefs = (...refs: any[]) => (value: any) => {
-        refs.forEach(ref => {
+        refs.forEach((ref) => {
             if (typeof ref === 'function') ref(value);
             else if (ref != null) ref.current = value;
         });
@@ -126,55 +127,38 @@ const TimelineItem: React.FC<TimelineItemProps> = ({
         cursor: 'ew-resize',
     };
 
-    const renderContent = () => {
-        if (isEditing) {
-            return (
-                <input
-                    type="text"
-                    value={editValue}
-                    onChange={handleInputChange}
-                    onBlur={handleInputBlur}
-                    onKeyDown={handleInputKeyDown}
-                    autoFocus
-                    style={{
-                        width: '100%',
-                        height: '100%',
-                        border: 'none',
-                        background: 'transparent',
-                        padding: '4px 8px',
-                        boxSizing: 'border-box',
-                        fontSize: '12px',
-                        color: 'white'
-                    }}
-                />
-            );
-        }
-
-        return (
-            <ItemContent ref={contentRef}>
-                {item.name}
-                <div style={{ fontSize: '10px', marginTop: '2px' }}>
-                    {format(startDate, 'dd/MM')} - {format(endDate, 'dd/MM')}
-                </div>
-            </ItemContent>
-        );
-    };
-
     return (
-        <ItemContainer
-            ref={mergeRefs(containerRef, setNodeRef)}
-            data-dragging={isDragging}
-            data-has-space={hasEnoughSpace}
-            {...listeners}
-            {...attributes}
-            style={style}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd}
-            onDoubleClick={handleDoubleClick}
-            className="timeline-item"
-        >
-            {renderContent()}
-        </ItemContainer>
+        <>
+            <ItemContainer
+                ref={mergeRefs(containerRef, setNodeRef)}
+                data-dragging={isDragging}
+                data-has-space={hasEnoughSpace}
+                data-hovered={isHovered}
+                data-selected={isSelected}
+                {...listeners}
+                {...attributes}
+                style={style}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDoubleClick={handleDoubleClick}
+                className="timeline-item"
+            >
+                <ItemContent ref={contentRef}>
+                    {item.name}
+                    <div style={{ fontSize: '10px', marginTop: '2px' }}>
+                        {format(startDate, 'dd/MM')} - {format(endDate, 'dd/MM')}
+                    </div>
+                </ItemContent>
+            </ItemContainer>
+
+            {isModalOpen && (
+                <EditItemModal
+                    item={item}
+                    onSave={handleSave}
+                    onClose={() => handleCloseModal()}
+                />
+            )}
+        </>
     );
 };
 

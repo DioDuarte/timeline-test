@@ -27,7 +27,7 @@ export const TimelineItemWrapper = styled.div<{
 
 export const ItemContainer = styled.div`
     position: absolute;
-    background: #4a90e2;
+    background: #4a90e2; // Cor padrão
     border-radius: 4px;
     padding: 4px 8px;
     color: white;
@@ -42,28 +42,38 @@ export const ItemContainer = styled.div`
     align-items: center;
     overflow: hidden;
     white-space: nowrap;
-    /* Alinhamento padrão à esquerda quando compacto */
     justify-content: flex-start;
 
-    /* Aplicando transições por padrão */
     transition: min-width 0.2s ease-out,
     background-color 0.2s ease,
     box-shadow 0.2s ease,
     transform 0.15s ease;
 
-    /* Centraliza quando tem espaço suficiente */
     &[data-has-space="true"] {
         justify-content: center;
     }
 
-    /* Comportamento de hover quando não está arrastando */
     &:hover:not([data-dragging="true"]) {
         min-width: 200px;
-        background: #357abd;
+        background: #357abd; // Hover padrão ao passar o mouse diretamente no item
         z-index: 20;
         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
         transform: translateY(-2px);
         justify-content: center;
+    }
+
+    &[data-hovered="true"]:not([data-dragging="true"]) {
+        background: #1d6da1; // Roxo vibrante para hover vindo do TimelinePanel
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        transform: translateY(-4px);
+        z-index: 25;
+    }
+
+    &[data-selected="true"]:not([data-dragging="true"]) {
+        background: #8e44ad; // Azul escuro para item selecionado
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+        transform: translateY(-2px);
+        z-index: 30;
     }
 
     &[data-dragging="true"],

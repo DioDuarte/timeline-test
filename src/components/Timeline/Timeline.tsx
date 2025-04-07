@@ -10,7 +10,7 @@ import {
     endOfWeek,
     subDays,
     subWeeks,
-    subMonths,
+    subMonths, differenceInDays,
 } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -25,7 +25,7 @@ import {
     TimelineGrid,
     VerticalGridLine,
     HorizontalGridLine,
-    Instructions,
+    Instructions, TimelineWrapper,
 } from './styles';
 import { TimelineItem as TimelineItemType, ZoomLevel } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
@@ -33,6 +33,7 @@ import { useTimelineConfig } from '../../context/TimelineContext';
 import { getTimelineDates } from '../../utils/dateUtils';
 import TimelineItem from '../TimelineItem/TimelineItem';
 import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
+import ItemsListPanel from "../TimelinePanel/TimelinePanel";
 import { DndContext, DragEndEvent } from '@dnd-kit/core';
 
 interface TimelineProps {
@@ -48,6 +49,13 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [scrollLeftStart, setScrollLeftStart] = useState(0);
     const [lastMinExpansion, setLastMinExpansion] = useState<Date | null>(null);
     const containerRef = useRef<HTMLDivElement>(null);
+    const accumulatedScrollDistanceRef = useRef<number>(0); // Acumulador para lazy loading
+    const [isItemModalOpen, setIsItemModalOpen] = useState(false);
+    const [selectedItemId, setSelectedItemId] = useState<number | undefined>();
+    const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
+    const [pendingScrollItem, setPendingScrollItem] = useState<TimelineItemType | null>(null); // Novo estado
+
+
 
     const { zoomLevel, setZoomLevel, paddingDaysBefore, paddingDaysAfter } = useTimelineConfig();
 
@@ -62,9 +70,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     // Definir largura fixa das colunas com base no nível de zoom
     const getFixedColumnWidth = (): number => {
         switch (zoomLevel) {
-            case 'day': return 60;   // Largura fixa para dias
-            case 'week': return 180; // Largura fixa para semanas (2x o dia)
-            case 'month': return 240; // Largura fixa para meses (4x o dia)
+            case 'day': return 60;
+            case 'week': return 180;
+            case 'month': return 240;
             default: return 60;
         }
     };
@@ -77,12 +85,12 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         setItemsWithLanes(assignLanes(items));
     }, [items]);
 
-    // Funções de expansão de datas (incremental)
-    const expandMinDate = (currentMin: Date) => {
+    // Funções de expansão de datas
+    const expandMinDate = (currentMin: Date, steps: number = 1) => {
         switch (zoomLevel) {
-            case 'day': return subDays(currentMin, 1);
-            case 'week': return subWeeks(currentMin, 1);
-            case 'month': return subMonths(currentMin, 1);
+            case 'day': return subDays(currentMin, steps);
+            case 'week': return subWeeks(currentMin, steps);
+            case 'month': return subMonths(currentMin, steps);
             default: return currentMin;
         }
     };
@@ -100,12 +108,11 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     useEffect(() => {
         if (!isDragging || !containerRef.current || !dynamicMinDate || dynamicMinDate === lastMinExpansion) return;
 
-        const currentScrollLeft = containerRef.current.scrollLeft;
         const previousDatesLength = timelineDates.length;
         const newTimelineDates = getTimelineDates(dynamicMinDate, currentMaxDate, zoomLevel, paddingDaysBefore, paddingDaysAfter);
         const addedColumns = newTimelineDates.length - previousDatesLength;
 
-        if (currentScrollLeft < 10 && addedColumns > 0) {
+        if (addedColumns > 0) {
             const scrollAdjustment = addedColumns * columnWidth;
             containerRef.current.scrollLeft += scrollAdjustment;
             setLastMinExpansion(dynamicMinDate);
@@ -114,10 +121,12 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     // Manipulação de eventos de arrastar
     const handleMouseDown = (e: React.MouseEvent<HTMLDivElement>) => {
-        if ((e.target as HTMLElement).closest('.timeline-item')) return;
+
+        if (isItemModalOpen || (e.target as HTMLElement).closest('.timeline-item')) return;
         setIsDragging(true);
         setStartX(e.pageX);
         setScrollLeftStart(containerRef.current?.scrollLeft || 0);
+        accumulatedScrollDistanceRef.current = 0; // Resetar acumulador
         e.preventDefault();
     };
 
@@ -130,9 +139,17 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
         const totalWidth = timelineDates.length * columnWidth;
 
-        // Expansão à esquerda (passado)
-        if (newScrollLeft < 10 && dynamicMinDate !== lastMinExpansion) {
-            setDynamicMinDate(expandMinDate(currentMinDate));
+        // Lazy loading à esquerda (passado)
+        if (newScrollLeft < 10) {
+            accumulatedScrollDistanceRef.current += Math.abs(deltaX); // Acumula distância scrollada
+            const minDistanceToLoad = columnWidth * 5; // Carrega só após 5 colunas de distância
+            const columnsToAdd = Math.floor(accumulatedScrollDistanceRef.current / minDistanceToLoad);
+
+            if (columnsToAdd >= 1 && dynamicMinDate !== lastMinExpansion) {
+                const steps = columnsToAdd * 5; // Expande em blocos de 5 unidades (dias, semanas, meses)
+                setDynamicMinDate(expandMinDate(currentMinDate, steps));
+                accumulatedScrollDistanceRef.current = 0; // Resetar após carregar
+            }
         }
 
         // Expansão à direita (futuro)
@@ -144,6 +161,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const handleMouseUp = () => {
         setIsDragging(false);
         setLastMinExpansion(null);
+        accumulatedScrollDistanceRef.current = 0; // Resetar acumulador
     };
 
     useEffect(() => {
@@ -167,6 +185,7 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     // Manipulação de arrastar itens
     const handleDragEnd = (event: DragEndEvent) => {
+        if(isItemModalOpen) return;
         const { active, delta } = event;
         const itemId = parseInt(active.id as string, 10);
         const item = itemsWithLanes.find((i) => i.id === itemId);
@@ -216,107 +235,213 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     const formatHeaderDate = (date: Date) => {
         switch (zoomLevel) {
-            case 'day': return format(date, 'd');
+            case 'day': return format(date, 'dd/MM/yy');
             case 'week': return `${format(startOfWeek(date, { locale: ptBR, weekStartsOn: 1 }), 'dd/MM')} - ${format(endOfWeek(date, { locale: ptBR, weekStartsOn: 1 }), 'dd/MM')}`;
             case 'month': return format(date, 'MMM yyyy', { locale: ptBR });
             default: return '';
         }
     };
 
+    const scrollToItem = (item: TimelineItemType) => {
+        setSelectedItemId(item.id);
+
+        if (!containerRef.current) {
+            return;
+        }
+
+        const {
+            clientWidth: containerWidth,
+            scrollLeft: currentScroll,
+            scrollWidth: totalWidth
+        } = containerRef.current;
+
+        const itemStart = parseISO(item.start);
+        const itemEnd = parseISO(item.end);
+
+        const findDateIndex = (date: Date) => {
+            switch (zoomLevel) {
+                case 'day':
+                    return timelineDates.findIndex((d) =>
+                        format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                    );
+                case 'week':
+                    return timelineDates.findIndex((d) => {
+                        const weekStart = startOfWeek(d, { locale: ptBR, weekStartsOn: 1 });
+                        const itemWeekStart = startOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
+                        return format(weekStart, 'yyyy-MM-dd') === format(itemWeekStart, 'yyyy-MM-dd');
+                    });
+                case 'month':
+                    return timelineDates.findIndex((d) =>
+                        format(d, 'yyyy-MM') === format(date, 'yyyy-MM')
+                    );
+                default:
+                    return -1;
+            }
+        };
+
+        const startIndex = findDateIndex(itemStart);
+        const endIndex = findDateIndex(itemEnd);
+
+        if (startIndex === -1 || endIndex === -1) {
+            const newMinDate = itemStart < timelineDates[0] ? itemStart : timelineDates[0];
+            const newMaxDate = itemEnd > timelineDates[timelineDates.length - 1]
+                ? itemEnd
+                : timelineDates[timelineDates.length - 1];
+            setDynamicMinDate(newMinDate);
+            setDynamicMaxDate(newMaxDate);
+            setPendingScrollItem(item);
+            return;
+        }
+
+        const itemStartPixel = startIndex * columnWidth;
+        const itemWidth = (endIndex - startIndex + 1) * columnWidth;
+        const itemCenterPixel = itemStartPixel + (itemWidth / 2);
+
+        let targetScroll = itemCenterPixel - (containerWidth / 2);
+        targetScroll = Math.max(0, Math.min(targetScroll, totalWidth - containerWidth));
+
+        const isOutOfView = itemStartPixel < currentScroll || (itemStartPixel + itemWidth) > (currentScroll + containerWidth);
+        const scrollDistance = Math.abs(targetScroll - currentScroll);
+        const behavior = (isOutOfView || scrollDistance > columnWidth) ? 'smooth' : 'auto';
+
+        containerRef.current.scrollTo({
+            left: targetScroll,
+            behavior
+        });
+    };
+
+    useEffect(() => {
+        if (pendingScrollItem && containerRef.current) {
+            const findDateIndex = (date: Date) => {
+                switch (zoomLevel) {
+                    case 'day':
+                        return timelineDates.findIndex((d) =>
+                            format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd')
+                        );
+                    case 'week':
+                        return timelineDates.findIndex((d) => {
+                            const weekStart = startOfWeek(d, { locale: ptBR, weekStartsOn: 1 });
+                            const itemWeekStart = startOfWeek(date, { locale: ptBR, weekStartsOn: 1 });
+                            return format(weekStart, 'yyyy-MM-dd') === format(itemWeekStart, 'yyyy-MM-dd');
+                        });
+                    case 'month':
+                        return timelineDates.findIndex((d) =>
+                            format(d, 'yyyy-MM') === format(date, 'yyyy-MM')
+                        );
+                    default:
+                        return -1;
+                }
+            };
+
+            const startIndex = findDateIndex(parseISO(pendingScrollItem.start));
+            if (startIndex !== -1) {
+                scrollToItem(pendingScrollItem);
+                setPendingScrollItem(null);
+            }
+        }
+    }, [timelineDates, pendingScrollItem]);
+
     return (
-        <TimelineContainer>
-            <TimelineControls>
-                <ZoomButton active={zoomLevel === 'day'} onClick={() => setZoomLevel('day')}>
-                    Dia
-                </ZoomButton>
-                <ZoomButton active={zoomLevel === 'week'} onClick={() => setZoomLevel('week')}>
-                    Semana
-                </ZoomButton>
-                <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
-                    Mês
-                </ZoomButton>
-            </TimelineControls>
+        <TimelineWrapper>
+            <TimelineContainer>
+                <TimelineControls>
+                    <ZoomButton active={zoomLevel === 'day'} onClick={() => setZoomLevel('day')}>
+                        Dia
+                    </ZoomButton>
+                    <ZoomButton active={zoomLevel === 'week'} onClick={() => setZoomLevel('week')}>
+                        Semana
+                    </ZoomButton>
+                    <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
+                        Mês
+                    </ZoomButton>
+                </TimelineControls>
 
-            <ScrollContainer
-                ref={containerRef}
-                onWheel={handleWheel}
-                onMouseDown={handleMouseDown}
-                onMouseMove={handleMouseMove}
-                style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
-            >
-                <TimelineHeader style={{ width: `${totalGridWidth}px` }}>
-                    <DateHeaderContainer>
-                        <div className="date-row">
-                            {timelineDates.map((date, index) => (
-                                <DateHeaderCell
-                                    key={index}
-                                    style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
-                                    isLast={index === timelineDates.length - 1}
-                                    isWeekend={date.getDay() === 0 || date.getDay() === 6}
-                                >
-                                    {formatHeaderDate(date)}
-                                    {zoomLevel === 'day' && (
-                                        <span className="day-of-week">{format(date, 'EEE', { locale: ptBR })}</span>
-                                    )}
-                                </DateHeaderCell>
-                            ))}
-                        </div>
-                    </DateHeaderContainer>
-                </TimelineHeader>
+                <ScrollContainer
+                    ref={containerRef}
+                    onWheel={handleWheel}
+                    onMouseDown={handleMouseDown}
+                    onMouseMove={handleMouseMove}
+                    style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
+                >
+                    <TimelineHeader style={{ width: `${totalGridWidth}px` }}>
+                        <DateHeaderContainer>
+                            <div className="date-row">
+                                {timelineDates.map((date, index) => (
+                                    <DateHeaderCell
+                                        key={index}
+                                        style={{ width: `${columnWidth}px`, minWidth: `${columnWidth}px`, maxWidth: `${columnWidth}px` }}
+                                        isLast={index === timelineDates.length - 1}
+                                        isWeekend={date.getDay() === 0 || date.getDay() === 6}
+                                    >
+                                        {formatHeaderDate(date)}
+                                        {zoomLevel === 'day' && (
+                                            <span className="day-of-week">{format(date, 'EEE', { locale: ptBR })}</span>
+                                        )}
+                                    </DateHeaderCell>
+                                ))}
+                            </div>
+                        </DateHeaderContainer>
+                    </TimelineHeader>
 
-                <TimelineBody>
-                    <DndContext onDragEnd={handleDragEnd}>
-                        <TimelineGrid style={{ width: `${totalGridWidth}px`, minHeight: `${totalGridHeight}px` }}>
-                            {activeLanes.map((laneId) =>
-                                itemsWithLanes
-                                    .filter((item) => item.lane === laneId)
-                                    .map((item) => (
-                                        <TimelineItem
-                                            key={item.id}
-                                            item={item}
-                                            items={itemsWithLanes}
-                                            minDate={currentMinDate}
-                                            maxDate={currentMaxDate}
-                                            totalWidth={totalGridWidth}
-                                            columnWidth={columnWidth}
-                                            maxLanes={activeLanes.length}
-                                            onItemChange={setItemsWithLanes}
-                                        />
-                                    ))
-                            )}
-                            {timelineDates.map((date, dateIndex) => (
-                                <VerticalGridLine
-                                    key={dateIndex}
-                                    style={{
-                                        left: `${dateIndex * columnWidth}px`,
-                                        height: `${totalGridHeight}px`,
-                                    }}
-                                    isWeekend={date.getDay() === 0 || date.getDay() === 6}
-                                    isMonthStart={date.getDate() === 1}
-                                />
-                            ))}
-                            {activeLanes.slice(0, -1).map((laneId, index) => (
-                                <HorizontalGridLine
-                                    key={`hgrid-${laneId}`}
-                                    style={{ top: `${(index + 1) * 60}px` }}
-                                />
-                            ))}
-                        </TimelineGrid>
-                    </DndContext>
-                </TimelineBody>
+                    <TimelineBody>
+                        <DndContext onDragEnd={handleDragEnd}>
+                            <TimelineGrid style={{ width: `${totalGridWidth}px`, minHeight: `${totalGridHeight}px` }}>
+                                {activeLanes.map((laneId) =>
+                                    itemsWithLanes
+                                        .filter((item) => item.lane === laneId)
+                                        .map((item) => (
+                                            <TimelineItem
+                                                key={item.id}
+                                                item={item}
+                                                onModalStateChange={setIsItemModalOpen}
+                                                items={itemsWithLanes}
+                                                minDate={currentMinDate}
+                                                maxDate={currentMaxDate}
+                                                totalWidth={totalGridWidth}
+                                                columnWidth={columnWidth}
+                                                maxLanes={activeLanes.length}
+                                                onItemChange={setItemsWithLanes}
+                                                isHovered={item.id === hoveredItemId}
+                                                isSelected={item.id === selectedItemId}
+                                            />
+                                        ))
+                                )}
+                                {timelineDates.map((date, dateIndex) => (
+                                    <VerticalGridLine
+                                        key={dateIndex}
+                                        style={{
+                                            left: `${dateIndex * columnWidth}px`,
+                                            height: `${totalGridHeight}px`,
+                                        }}
+                                        isWeekend={date.getDay() === 0 || date.getDay() === 6}
+                                        isMonthStart={date.getDate() === 1}
+                                    />
+                                ))}
+                                {activeLanes.slice(0, -1).map((laneId, index) => (
+                                    <HorizontalGridLine
+                                        key={`hgrid-${laneId}`}
+                                        style={{ top: `${(index + 1) * 60}px` }}
+                                    />
+                                ))}
+                            </TimelineGrid>
+                        </DndContext>
+                    </TimelineBody>
 
-                <ScrollArrows scrollContainerRef={containerRef} totalGridWidth={totalGridWidth} />
-            </ScrollContainer>
+                    <ScrollArrows scrollContainerRef={containerRef} totalGridWidth={totalGridWidth} />
+                </ScrollContainer>
 
-            <Instructions>
-                <p><strong>Instruções:</strong></p>
-                <ul>
-                    <li>Arraste itens horizontalmente para reposicioná-los no tempo</li>
-                    <li>Arraste a timeline com o mouse para navegar pelas datas</li>
-                    <li>Use os botões de zoom ou role o mouse com Alt pressionado para mudar a visualização</li>
-                </ul>
-            </Instructions>
-        </TimelineContainer>
+                <Instructions>
+                    <p><strong>Instruções:</strong></p>
+                    <ul>
+                        <li>Arraste itens horizontalmente para reposicioná-los no tempo</li>
+                        <li>Arraste a timeline com o mouse para navegar pelas datas</li>
+                        <li>Use os botões de zoom ou role o mouse com Alt pressionado para mudar a visualização</li>
+                    </ul>
+                </Instructions>
+            </TimelineContainer>
+            <ItemsListPanel  items={itemsWithLanes} selectedItemId={selectedItemId} onItemSelect={scrollToItem} timelineRef={containerRef} onItemHover={setHoveredItemId}/>
+        </TimelineWrapper>
+
     );
 };
 

@@ -1,5 +1,14 @@
 import styled from 'styled-components';
 
+export const TimelineWrapper = styled.div`
+  display: flex;
+  gap: 40px;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+`;
+
+
 // Componentes Estilizados
 export const TimelineContainer = styled.div`
   display: flex;
