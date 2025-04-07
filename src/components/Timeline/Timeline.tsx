@@ -13,7 +13,6 @@ import {
     getTimelineDates,
 } from '../../utils/dateUtils';
 import { formatDetailedDate } from '../../utils/formatUtils';
-import ScrollArrows from '../common/ScrollArrow/ScrollArrow';
 import ItemsListPanel from '../TimelinePanel/TimelinePanel';
 import { DragEndEvent } from '@dnd-kit/core';
 import { useDragScroll } from '../../hooks/useDragScroll';
@@ -60,7 +59,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
 
     const { isDragging, setIsDragging, handleMouseDown, handleMouseMove } = useDragScroll(containerRef);
 
-    // Use the zoom control hook
     const { handleWheel, handleZoomChange } = useZoomControl(
         zoomLevel,
         setZoomLevel,
@@ -69,10 +67,8 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         timelineDates,
         columnWidth,
         containerRef,
-        items // Pass items for centering on first item during direct zoom
+        items
     );
-
-
 
     const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
         if ((e.target as HTMLElement).closest('.timeline-item')) return;
@@ -235,15 +231,12 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 <TimelineControlsComponent
                     zoomLevel={zoomLevel}
                     setZoomLevel={handleZoomChange}
-                    focusIndicatorVisible={focusIndicatorVisible}
-                    onRemoveFocus={() => setFocusIndicatorVisible(false)}
                 />
                 <ScrollContainer
                     ref={containerRef}
                     onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
-                    onDoubleClick={handleDoubleClick}
                     style={{ cursor: isDragging ? 'grabbing' : 'grab' }}
                 >
                     <TimelineHeaderComponent
@@ -265,16 +258,9 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             columnWidth={columnWidth}
                             totalGridWidth={totalGridWidth}
                             totalGridHeight={totalGridHeight}
-                            focusIndicatorVisible={focusIndicatorVisible}
-                            focusIndicatorPosition={focusIndicatorPosition}
-                            focusTooltipText={focusTooltipText}
                             onDragEnd={handleDragEnd}
                         />
                     </TimelineBody>
-                    <ScrollArrows
-                        scrollContainerRef={containerRef}
-                        totalGridWidth={totalGridWidth}
-                    />
                 </ScrollContainer>
                 <TimelineInstructions />
             </TimelineContainer>

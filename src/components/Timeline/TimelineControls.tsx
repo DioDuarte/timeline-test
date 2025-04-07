@@ -6,15 +6,25 @@ import { useLocalization } from '../../context/LocalizationContext';
 interface TimelineControlsProps {
     zoomLevel: ZoomLevel;
     setZoomLevel: (zoom: ZoomLevel) => void;
-    focusIndicatorVisible: boolean;
-    onRemoveFocus: () => void;
 }
+
+const LanguageSwitcher: React.FC = () => {
+    const { language, setLanguage } = useLocalization();
+    return (
+        <>
+            <select style={{height: '34px', width: '100px', textAlign: 'center', paddingRight: '3px'}} value={language} onChange={(e) => setLanguage(e.target.value as 'en' | 'pt')}>
+                <option value="en">English</option>
+                <option value="pt">Português</option>
+            </select>
+        </>
+
+    );
+};
 
 const TimelineControlsComponent: React.FC<TimelineControlsProps> = ({
                                                                         zoomLevel,
                                                                         setZoomLevel,
-                                                                        focusIndicatorVisible,
-                                                                        onRemoveFocus,
+
                                                                     }) => {
     const { t } = useLocalization();
 
@@ -29,22 +39,8 @@ const TimelineControlsComponent: React.FC<TimelineControlsProps> = ({
             <ZoomButton active={zoomLevel === 'month'} onClick={() => setZoomLevel('month')}>
                 {t('month')}
             </ZoomButton>
-            <button
-                onClick={onRemoveFocus}
-                disabled={!focusIndicatorVisible}
-                style={{
-                    marginLeft: 'auto',
-                    opacity: focusIndicatorVisible ? 1 : 0.5,
-                    padding: '4px 8px',
-                    borderRadius: '4px',
-                    background: '#f44336',
-                    color: 'white',
-                    border: 'none',
-                    cursor: focusIndicatorVisible ? 'pointer' : 'default',
-                }}
-            >
-                {t('removeReferencePoint')}
-            </button>
+
+            <LanguageSwitcher/>
         </TimelineControls>
     );
 };

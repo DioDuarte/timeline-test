@@ -35,7 +35,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
     const handleSave = () => {
         onSave({
             name,
-            start: startDate,
+            start: startDate, // Already in 'yyyy-MM-dd' format, compatible with ISO
             end: endDate,
         });
     };
@@ -63,7 +63,9 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
                         {FiEdit2({ size: 16, style: { marginRight: '8px' } })}
                         {t('editItem')}
                     </ModalTitle>
-                    <CloseButton onClick={onClose}>{FiX({ size: 18 })}</CloseButton>
+                    <CloseButton onClick={onClose}>
+                        {FiX({ size: 18 })}
+                    </CloseButton>
                 </ModalHeader>
 
                 <ModalBody style={{ width: '100%', height: '100%' }}>

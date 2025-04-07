@@ -9,18 +9,7 @@ import {LocalizationProvider, useLocalization} from "./context/LocalizationConte
 function App() {
   const [items, setItems] = useState<TimelineItem[]>(timelineItems);
 
-    const LanguageSwitcher: React.FC = () => {
-        const { language, setLanguage } = useLocalization();
-        return (
-            <>
-                <select value={language} onChange={(e) => setLanguage(e.target.value as 'en' | 'pt')}>
-                    <option value="en">English</option>
-                    <option value="pt">Português</option>
-                </select>
-            </>
 
-        );
-    };
 
     return (
         <div className="App">
@@ -31,7 +20,6 @@ function App() {
         <main className="App-main">
             <LocalizationProvider>
                 <TimelineProvider>
-                    <LanguageSwitcher/>
                     <Timeline items={items} />
                 </TimelineProvider>
             </LocalizationProvider>

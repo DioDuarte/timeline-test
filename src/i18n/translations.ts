@@ -37,6 +37,9 @@ export const translations: Record<Language, Translations> = {
         endDate: 'Data de Fim',
         cancel: 'Cancelar',
         saveChanges: 'Salvar Alterações',
+
+        // TimelinePanel
+        panelTitle: 'Lista de Eventos/Navegação Rápida',
     },
     en: {
         // TimelineControlsComponent
@@ -47,13 +50,13 @@ export const translations: Record<Language, Translations> = {
 
         // TimelineInstructions
         instructions: 'Instructions:',
-        dragItems: 'Drag items horizontally to reposition them in time',
+        dragItems: 'Drag events horizontally to reposition them in time',
         dragTimeline: 'Drag the timeline with the mouse to navigate through dates',
         zoomButtons: 'Use the zoom buttons or scroll the mouse with Alt pressed to change the view',
         doubleClickDate: 'Double-click any date to create a zoom reference point',
         doubleClickEvent: 'Double-click any timeline event to open the event editing modal',
-        quickNavPanel: 'On the right, there is the quick navigation panel',
-        selectEvent: 'Selecting any event will center it on the timeline with a different color for easier visualization.',
+        quickNavPanel: 'On the right you can easily navigate through the events',
+        selectEvent: 'Selecting any event from the event list will center it on the timeline with a different color for easier visualization.',
 
         // EditItemModal
         editItem: 'Edit Item',
@@ -62,5 +65,8 @@ export const translations: Record<Language, Translations> = {
         endDate: 'End Date',
         cancel: 'Cancel',
         saveChanges: 'Save Changes',
+
+        // TimelinePanel
+        panelTitle: 'Event List/Quick Navigation',
     },
 };

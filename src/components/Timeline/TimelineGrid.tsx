@@ -10,9 +10,6 @@ interface TimelineGridProps {
     columnWidth: number;
     totalGridWidth: number;
     totalGridHeight: number;
-    focusIndicatorVisible: boolean;
-    focusIndicatorPosition: number;
-    focusTooltipText: string;
     onDragEnd: (event: DragEndEvent) => void;
     setIsItemModalOpen: (isOpen: boolean) => void;
     isItemModalOpen: boolean;
@@ -29,9 +26,6 @@ const TimelineGridComponent: React.FC<TimelineGridProps> = ({
                                                                 columnWidth,
                                                                 totalGridWidth,
                                                                 totalGridHeight,
-                                                                focusIndicatorVisible,
-                                                                focusIndicatorPosition,
-                                                                focusTooltipText,
                                                                 onDragEnd,
                                                                 setIsItemModalOpen,
                                                                 currentMinDate,
@@ -48,57 +42,6 @@ const TimelineGridComponent: React.FC<TimelineGridProps> = ({
         <DndContext onDragEnd={onDragEnd}>
             <TimelineGrid style={{ width: `${totalGridWidth}px`, minHeight: `${totalGridHeight}px` }}>
                 <Sentinel id="sentinel-left" style={{ left: '0px', width: '50px', height: `${totalGridHeight}px` }} />
-                {focusIndicatorVisible && (
-                    <div
-                        style={{
-                            position: 'absolute',
-                            left: `${focusIndicatorPosition}px`,
-                            top: '0',
-                            height: '100%',
-                            width: '2px',
-                            backgroundColor: '#ff6b6b',
-                            zIndex: 10,
-                            opacity: focusIndicatorVisible ? 0.8 : 0,
-                            transition: 'opacity 0.3s ease',
-                            boxShadow: '0 0 8px rgba(255, 107, 107, 0.8)',
-                        }}
-                    >
-                        <div
-                            style={{
-                                position: 'absolute',
-                                top: '-40px',
-                                left: '-50px',
-                                width: '120px',
-                                backgroundColor: '#333',
-                                color: 'white',
-                                borderRadius: '4px',
-                                padding: '4px 8px',
-                                fontSize: '12px',
-                                textAlign: 'center',
-                                opacity: 1,
-                                transition: 'opacity 0.2s ease',
-                                pointerEvents: 'none',
-                                zIndex: 20,
-                                whiteSpace: 'nowrap',
-                                fontWeight: 'bold',
-                            }}
-                        >
-                            {focusTooltipText}
-                        </div>
-                        <div
-                            style={{
-                                position: 'absolute',
-                                top: '-10px',
-                                left: '-5px',
-                                width: '12px',
-                                height: '12px',
-                                backgroundColor: '#ff6b6b',
-                                borderRadius: '50%',
-                                boxShadow: '0 0 8px rgba(255, 107, 107, 0.8)',
-                            }}
-                        />
-                    </div>
-                )}
                 {activeLanes.map((laneId) =>
                     itemsWithLanes
                         .filter((item) => item.lane === laneId)

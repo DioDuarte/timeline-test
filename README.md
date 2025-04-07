@@ -1,46 +1,166 @@
-# Getting Started with Create React App
+# Interactive Timeline - Project Retrospective
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+## Table of Contents
+- [Project Overview](#project-overview)
+- [What I Like About My Implementation](#what-i-like-about-my-implementation)
+- [What I Would Change If Doing It Again](#what-i-would-change-if-doing-it-again)
+- [Design Decisions](#design-decisions)
+- [Testing Approach](#testing-approach)
+- [Timeline Project Setup Guide](#timeline-project-setup-guide)
+    - [📋 Prerequisites](#-prerequisites)
+    - [🚀 How to Run the Project](#-how-to-run-the-project)
+    - [🛠 Troubleshooting](#-troubleshooting)
 
-## Available Scripts
+# What I Like About My Implementation
+## 1. Well-Structured and Maintainable Code
 
-In the project directory, you can run:
+- Modular components with clear responsibilities (Timeline, Header, Controls, Grid)
 
-### `npm start`
+- Context API for global state (zoom, language) avoiding prop drilling
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
+- TypeScript everywhere for type safety and self-documenting code
 
-The page will reload if you make edits.\
-You will also see any lint errors in the console.
+- Organized folder structure by feature (components, hooks, utils)
 
-### `npm test`
+## 2. Fluid User Experience
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- Interactive timeline with:
+  - Drag-to-scroll navigation
+  - Event dragging/resizing
+  - Intuitive zoom controls (day/week/month)
+  - Quick navigation panel
 
-### `npm run build`
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- Full **internationalization support** (English/Portuguese)
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## 3. Scalable Architecture
+- Complex logic isolated in custom hooks (`useDragScroll`, `useZoomControl`)
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- Performance optimizations:
+  - Memoization to prevent unnecessary re-renders
+  - IntersectionObserver for infinite scrolling
 
-### `npm run eject`
+- Theme system with styled-components for consistent styling
 
-**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
+## 4. Future-Ready Foundation
+The architecture supports easy addition of:
 
-If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- New languages (just add translations)
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
+- Additional zoom levels (quarter, year)
 
-You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
+- Real API integration (currently uses mock data)
 
-## Learn More
+# What I Would Change If Doing It Again
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+## 1. Testing Strategy
+- Add comprehensive test coverage:
+
+  - Unit tests for utils/date functions
+  - Integration tests for components
+  - E2E tests for critical workflows
+
+## 2. Performance Enhancements
+- Implement proper virtualization for long lists
+- Add more aggressive memoization
+
+
+## 3. Accessibility Improvements
+- Add proper ARIA attributes
+- Keyboard navigation support
+- Focus management
+
+# Design Decisions
+## Inspiration
+- I studied several timeline implementations including:
+
+    - Google Calendar (for zoom interactions)
+    - Trello (for drag-and-drop behavior)
+    - GitHub Contributions Graph (for compact visualization)
+
+## Key Decisions
+
+ - Zoom Levels: Chose day/week/month as most practical for common use cases
+
+ - Lane System: Developed custom algorithm to prevent event overlaps
+
+ - Infinite Scroll: Implemented sentinel-based loading instead of pagination
+
+ - Mobile First: Designed for touch interactions from the start
+
+# Testing Approach
+
+## Expanded Test Plan Given More Time
+
+```js 
+// Sample test cases I would implement:
+
+        describe('Timeline Interactions', () => {
+        test('should prevent invalid date ranges when dragging', () => {
+        // Verify drag validation logic
+      });
+    
+        test('should maintain lane assignments after zoom change', () => {
+        // Test consistency across zoom levels
+        });
+      });
+    
+        describe('Localization', () => {
+        test('should format dates correctly in Portuguese', () => {
+        expect(formatDate(new Date(), 'pt')).toMatch(/^\d{2}\/\d{2}\/\d{4}$/);
+        });
+      });
+```
+    
+## Testing Pyramid Goal:
+- 70% unit tests (utils, hooks)
+
+- 20% integration tests (component interactions)
+
+- 10% E2E tests (critical user journeys)
+
+#  Timeline Project Setup Guide
+## 📋 Prerequisites
+ - Node.js (version 16.x or higher)
+ - npm (comes with Node.js) or yarn
+ - Git (optional, for repository cloning)
+
+## 🚀 How to Run the Project
+### 1. Install Dependencies
+#### First, install all required dependencies:
+
+```bash
+npm install
+# or
+yarn install
+```
+
+### 2. Development Environment
+#### To start the development server:
+
+```bash
+npm start
+# or
+yarn start
+```
+
+### 3. Production Build
+#### To create an optimized production build:
+```bash
+npm run build
+# or
+yarn build
+```
+
+# 🌐 Accessing the Project
+### After starting with npm start, the application will be available at: http://localhost:3000
+
+# 🛠 Troubleshooting
+### If you encounter errors:
+
+#### 1. Try deleting the node_modules folder and running npm install again
+
+#### 2. Verify you're using the correct Node.js version
+
+#### 3. Check the error logs in the terminal for more details
