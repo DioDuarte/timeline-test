@@ -1,4 +1,27 @@
-// hooks/useSyncHeight.ts
+/**
+ * @hook useSyncHeight
+ *
+ * @description
+ * Custom hook that synchronizes an element's height based on another element's height.
+ * Uses ResizeObserver to automatically detect size changes in the reference element.
+ *
+ * @param {React.RefObject<HTMLElement | null>} sourceRef - Reference to the HTML element whose height will be monitored
+ *
+ * @returns {string} Height value formatted as CSS string (e.g., "100px" or "100%")
+ *
+ * @example
+ * // In the component
+ * const contentRef = useRef<HTMLDivElement>(null);
+ * const height = useSyncHeight(contentRef);
+ *
+ * return (
+ *   <div>
+ *     <div ref={contentRef}>Main content</div>
+ *     <div style={{ height }}>This element will have the same height as the main content</div>
+ *   </div>
+ * );
+ **/
+
 import React, { useState, useEffect, useRef } from 'react';
 
 export const useSyncHeight = (sourceRef: React.RefObject<HTMLElement | null>) => {
@@ -14,10 +37,8 @@ export const useSyncHeight = (sourceRef: React.RefObject<HTMLElement | null>) =>
             }
         };
 
-        // Atualiza imediatamente
         updateHeight();
 
-        // Configura o observer para mudanças futuras
         resizeObserver.current = new ResizeObserver(updateHeight);
         resizeObserver.current.observe(sourceRef.current);
 

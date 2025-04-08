@@ -1,12 +1,11 @@
 import React, { createContext, useContext, useState, ReactNode } from 'react';
 import { ZoomLevel } from '../types/types';
-import {addMonths, differenceInDays} from "date-fns";
 
 interface TimelineConfig {
     zoomLevel: ZoomLevel;
-    paddingUnits: number; // Número de unidades de padding (ex.: 2)
-    paddingDaysBefore: number; // Valor em dias, calculado com base no zoomLevel
-    paddingDaysAfter: number;  // Valor em dias, calculado com base no zoomLevel
+    paddingUnits: number;
+    paddingDaysBefore: number;
+    paddingDaysAfter: number;
     setZoomLevel: (zoom: ZoomLevel) => void;
     setPaddingUnits: (units: number) => void;
 }
@@ -19,17 +18,16 @@ interface TimelineProviderProps {
 
 export const TimelineProvider: React.FC<TimelineProviderProps> = ({ children }) => {
     const [zoomLevel, setZoomLevel] = useState<ZoomLevel>('day');
-    const [paddingUnits, setPaddingUnits] = useState(2); // Padrão: 2 unidades
+    const [paddingUnits, setPaddingUnits] = useState(2);
 
-    // Função para calcular padding em dias com base no zoomLevel
     const calculatePaddingDays = (units: number, zoom: ZoomLevel): number => {
         switch (zoom) {
             case 'day':
-                return units; // Mantém padding para 'day'
+                return units;
             case 'week':
-                return 0; // Sem padding para 'week'
+                return 0;
             case 'month':
-                return 0; // Sem padding para 'month'
+                return 0;
             default:
                 return units;
         }

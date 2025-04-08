@@ -1,4 +1,4 @@
-// src/components/TimelineItem/TimelineItem.tsx
+
 import {useLocalization} from "../../context/LocalizationContext";
 import React, { useState, useEffect, useRef, CSSProperties } from 'react';
 import { ItemContainer, ItemContent } from './styles';

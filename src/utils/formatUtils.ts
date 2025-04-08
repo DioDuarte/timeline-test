@@ -1,4 +1,3 @@
-// src/utils/formatUtils.ts
 import {
     format,
     parse,
@@ -39,21 +38,21 @@ export function parseDate(dateString: string): Date {
  * @returns A formatted string suitable for the timeline header
  */
 export const formatTimelineHeaderDate = (date: Date, zoomLevel: ZoomLevel, locale: Locale): string => {
-    const isPortuguese = locale === ptBR; // Verifica se o locale é ptBR
-    const dateFormat = isPortuguese ? 'dd/MM' : 'MM/dd'; // Define o formato correto por idioma
+    const isPortuguese = locale === ptBR;
+    const dateFormat = isPortuguese ? 'dd/MM' : 'MM/dd';
 
     switch (zoomLevel) {
         case 'day':
             return format(date, dateFormat, { locale });
         case 'week': {
-            const start = startOfWeek(date, { locale, weekStartsOn: 1 }); // Segunda-feira como início
-            const end = endOfWeek(date, { locale, weekStartsOn: 1 });     // Domingo como fim
+            const start = startOfWeek(date, { locale, weekStartsOn: 1 });
+            const end = endOfWeek(date, { locale, weekStartsOn: 1 });
             return `${format(start, dateFormat, { locale })} - ${format(end, dateFormat, { locale })}`;
         }
         case 'month':
             return format(date, 'MMMM yyyy', { locale });
         default:
-            return format(date, dateFormat, { locale }); // Padrão
+            return format(date, dateFormat, { locale });
     }
 };
 

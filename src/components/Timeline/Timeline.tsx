@@ -6,13 +6,10 @@ import { TimelineItem as TimelineItemType } from '../../types/types';
 import { assignLanes } from '../../utils/assignLanes';
 import { useTimelineConfig } from '../../context/TimelineContext';
 import {
-    calculateFocusIndicatorPosition,
     expandMaxDate,
     expandMinDate,
-    getDateAtPosition,
     getTimelineDates,
 } from '../../utils/dateUtils';
-import { formatDetailedDate } from '../../utils/formatUtils';
 import ItemsListPanel from '../TimelinePanel/TimelinePanel';
 import { DragEndEvent } from '@dnd-kit/core';
 import { useDragScroll } from '../../hooks/useDragScroll';
@@ -39,10 +36,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
     const [isItemModalOpen, setIsItemModalOpen] = useState(false);
     const [selectedItemId, setSelectedItemId] = useState<number | undefined>();
     const [hoveredItemId, setHoveredItemId] = useState<number | null>(null);
-    const [focusPoint, setFocusPoint] = useState<Date | null>(null);
-    const [focusIndicatorVisible, setFocusIndicatorVisible] = useState(false);
-    const [focusIndicatorPosition, setFocusIndicatorPosition] = useState(0);
-    const [focusTooltipText, setFocusTooltipText] = useState<string>('');
 
     const sortedItems = [...items].sort((a, b) => parseISO(a.start).getTime() - parseISO(b.start).getTime());
     const initialMinDate = sortedItems.length > 0 ? parseISO(sortedItems[0].start) : new Date();
@@ -70,26 +63,24 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         items
     );
 
-    const handleDoubleClick = (e: React.MouseEvent<HTMLDivElement>) => {
-        if ((e.target as HTMLElement).closest('.timeline-item')) return;
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
 
-        if (focusIndicatorVisible && containerRef.current) {
-            const containerRect = containerRef.current.getBoundingClientRect();
-            const clickPosition = e.clientX - containerRect.left + containerRef.current.scrollLeft;
-            const tolerance = 10;
-
-            if (Math.abs(clickPosition - focusIndicatorPosition) <= tolerance) {
-                setFocusIndicatorVisible(false);
-                return;
+        const handleWheelEvent = (event: WheelEvent) => {
+            if (event.altKey) {
+                event.preventDefault();
+                event.stopPropagation();
+                handleWheel(event as any);
             }
-        }
+        };
 
-        const exactDate = getDateAtPosition(e.clientX, timelineDates, columnWidth, zoomLevel, containerRef);
-        setFocusPoint(exactDate);
-        setFocusIndicatorVisible(true);
-        setFocusTooltipText(formatDetailedDate(exactDate, locale));
-        setFocusIndicatorPosition(calculateFocusIndicatorPosition(exactDate, timelineDates, zoomLevel, columnWidth));
-    };
+        container.addEventListener('wheel', handleWheelEvent, { passive: false });
+
+        return () => {
+            container.removeEventListener('wheel', handleWheelEvent);
+        };
+    }, [handleWheel]);
 
     const handleMouseUp = () => {
         setIsDragging(false);
@@ -176,10 +167,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                             const addedColumns = newDates.length - previousLength;
                             const scrollAdjustment = addedColumns * columnWidth;
 
-                            if (focusPoint && focusIndicatorVisible) {
-                                setFocusIndicatorPosition((prevPosition) => prevPosition + scrollAdjustment);
-                            }
-
                             containerRef.current!.scrollLeft += scrollAdjustment;
                             setDynamicMinDate(newMinDate);
                             previousDatesLengthRef.current = newDates.length;
@@ -203,27 +190,13 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
         if (rightSentinel) observer.observe(rightSentinel);
 
         return () => observer.disconnect();
-    }, [currentMinDate, currentMaxDate, zoomLevel, timelineDates, columnWidth, focusPoint, focusIndicatorVisible]);
+    }, [currentMinDate, currentMaxDate, zoomLevel, timelineDates, columnWidth]);
 
     useEffect(() => {
         window.addEventListener('mouseup', handleMouseUp);
         return () => window.removeEventListener('mouseup', handleMouseUp);
     }, []);
 
-    useEffect(() => {
-        if (focusPoint && containerRef.current && focusIndicatorVisible) {
-            const newPosition = calculateFocusIndicatorPosition(focusPoint, timelineDates, zoomLevel, columnWidth);
-            setFocusIndicatorPosition(newPosition);
-
-            const containerWidth = containerRef.current.clientWidth;
-            const targetScroll = newPosition - containerWidth / 2;
-
-            containerRef.current.scrollTo({
-                left: Math.max(0, targetScroll),
-                behavior: 'smooth',
-            });
-        }
-    }, [zoomLevel, focusPoint, timelineDates, columnWidth, focusIndicatorVisible]);
 
     return (
         <TimelineWrapper>
@@ -234,7 +207,6 @@ const Timeline: React.FC<TimelineProps> = ({ items }) => {
                 />
                 <ScrollContainer
                     ref={containerRef}
-                    onWheel={handleWheel}
                     onMouseDown={handleMouseDown}
                     onMouseMove={handleMouseMove}
                     style={{ cursor: isDragging ? 'grabbing' : 'grab' }}

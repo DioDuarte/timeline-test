@@ -1,4 +1,4 @@
-// src/utils/timelineUtils.ts
+
 import { DragEndEvent } from '@dnd-kit/core';
 import { TimelineItem, ZoomLevel } from '../types/types';
 import {parseISO, addDays, format, differenceInCalendarDays} from 'date-fns';
@@ -54,7 +54,7 @@ export function handleItemDragEnd(
     setItems(assignLanes(updatedItems));
 }
 
-// Definir largura fixa das colunas com base no nível de zoom
+
 export const getFixedColumnWidth = (zoomLevel: string): number => {
     switch (zoomLevel) {
         case 'day': return 60;

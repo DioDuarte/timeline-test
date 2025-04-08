@@ -35,7 +35,7 @@ export const EditItemModal: React.FC<EditItemModalProps> = ({ item, onSave, onCl
     const handleSave = () => {
         onSave({
             name,
-            start: startDate, // Already in 'yyyy-MM-dd' format, compatible with ISO
+            start: startDate,
             end: endDate,
         });
     };

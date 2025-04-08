@@ -1,7 +1,64 @@
+/**
+ * @hook useZoomControl
+ *
+ * @description
+ * Custom hook that manages zoom controls for a Timeline component.
+ * Allows switching between different zoom levels (day, week, month) and maintains
+ * the focal point during zoom operations.
+ *
+ * @param {ZoomLevel} zoomLevel - Current zoom level ('day', 'week', or 'month')
+ * @param {Function} setZoomLevel - Function to update the zoom level
+ * @param {Function} setDynamicMinDate - Function to update the minimum visible date
+ * @param {Function} setDynamicMaxDate - Function to update the maximum visible date
+ * @param {Date[]} timelineDates - Array of dates displayed in the timeline
+ * @param {number} columnWidth - Width of each timeline column (in pixels)
+ * @param {React.RefObject<HTMLDivElement | null>} containerRef - Reference to the DOM element containing the timeline
+ * @param {TimelineItemType[]} [items] - Optional list of timeline items for centering
+ *
+ * @returns {Object} Object containing:
+ *   - handleWheel: Function that manages zoom events via scroll with Alt key
+ *   - handleZoomChange: Function to directly change zoom level
+ *
+ * @example
+ * // In the Timeline component
+ * const { handleWheel, handleZoomChange } = useZoomControl(
+ *   zoomLevel,
+ *   setZoomLevel,
+ *   setDynamicMinDate,
+ *   setDynamicMaxDate,
+ *   timelineDates,
+ *   columnWidth,
+ *   containerRef,
+ *   items
+ * );
+ *
+ * // Using the wheel handler for zoom
+ * useEffect(() => {
+ *   const container = containerRef.current;
+ *   if (!container) return;
+ *
+ *   const handleWheelEvent = (event: WheelEvent) => {
+ *     if (event.altKey) {
+ *       event.preventDefault();
+ *       handleWheel(event as any);
+ *     }
+ *   };
+ *
+ *   container.addEventListener('wheel', handleWheelEvent, { passive: false });
+ *   return () => container.removeEventListener('wheel', handleWheelEvent);
+ * }, [handleWheel]);
+ *
+ * // Using the direct zoom change handler
+ * <TimelineControlsComponent
+ *   zoomLevel={zoomLevel}
+ *   setZoomLevel={handleZoomChange}
+ * />
+ */
+
 import React, { useCallback } from 'react';
 import {TimelineItem as TimelineItemType, ZoomLevel} from '../types/types';
-import { getTimelineDates, expandMinDate, expandMaxDate } from '../utils/dateUtils';
-import {addDays, differenceInDays, format, parseISO, subDays} from 'date-fns';
+import { getTimelineDates } from '../utils/dateUtils';
+import {addDays, format, parseISO, subDays} from 'date-fns';
 import { getFixedColumnWidth } from '../utils/timelineUtils';
 
 
@@ -13,23 +70,23 @@ export const useZoomControl = (
     timelineDates: Date[],
     columnWidth: number,
     containerRef: React.RefObject<HTMLDivElement | null>,
-    items?: TimelineItemType[] // Optional: for centering on first item during direct zoom
+    items?: TimelineItemType[]
 ) => {
-    // Map zoom levels to visible days
+
     const getVisibleDays = useCallback((zoom: ZoomLevel): number => {
         switch (zoom) {
             case 'day':
-                return 30; // ~1 month
+                return 30;
             case 'week':
-                return 90; // ~3 months
+                return 90;
             case 'month':
-                return 365; // ~1 year
+                return 365;
             default:
                 return 30;
         }
     }, []);
 
-    // Handle wheel-based zooming (with Alt key)
+
     const handleWheel = useCallback(
         (event: React.WheelEvent<HTMLDivElement>) => {
             if (!event.altKey || !containerRef.current) return;
@@ -38,7 +95,6 @@ export const useZoomControl = (
 
             const zoomLevels: ZoomLevel[] = ['month', 'week', 'day'];
             const currentIndex = zoomLevels.indexOf(zoomLevel);
-            // Normalize delta: positive delta (scroll down) zooms in, negative (scroll up) zooms out
             const delta = event.deltaY > 0 ? -1 : 1;
             const newIndex = Math.min(Math.max(currentIndex + delta, 0), zoomLevels.length - 1);
 
@@ -46,24 +102,20 @@ export const useZoomControl = (
 
             const newZoomLevel = zoomLevels[newIndex];
 
-            // Get mouse position relative to container
             const containerRect = containerRef.current.getBoundingClientRect();
             const mouseX = event.clientX - containerRect.left + containerRef.current.scrollLeft;
             const columnIndex = Math.floor(mouseX / columnWidth);
             const centerDate = timelineDates[Math.max(0, Math.min(columnIndex, timelineDates.length - 1))];
 
-            // Calculate new min and max dates
             const newVisibleDays = getVisibleDays(newZoomLevel);
             const halfVisibleDays = Math.floor(newVisibleDays / 2);
             const newMinDate = subDays(centerDate, halfVisibleDays);
             const newMaxDate = addDays(centerDate, halfVisibleDays);
 
-            // Update state
             setZoomLevel(newZoomLevel);
             setDynamicMinDate(newMinDate);
             setDynamicMaxDate(newMaxDate);
 
-            // Adjust scroll to keep centerDate in view
             setTimeout(() => {
                 if (containerRef.current) {
                     const newTimelineDates = getTimelineDates(newMinDate, newMaxDate, newZoomLevel, 0, 0);
@@ -90,12 +142,10 @@ export const useZoomControl = (
         ]
     );
 
-    // Handle direct zoom level change (e.g., via UI controls)
     const handleZoomChange = useCallback(
         (newZoomLevel: ZoomLevel, centerDate?: Date) => {
             if (newZoomLevel === zoomLevel) return;
 
-            // Default to first item's start date if no centerDate provided and items are available
             let targetDate = centerDate;
             if (!targetDate && items && items.length > 0) {
                 const sortedItems = [...items].sort(
@@ -103,23 +153,20 @@ export const useZoomControl = (
                 );
                 targetDate = parseISO(sortedItems[0].start);
             }
-            // Fallback to current minDate if no items or centerDate
             if (!targetDate) {
                 targetDate = timelineDates[0] || new Date();
             }
 
-            // Calculate new min and max dates
             const newVisibleDays = getVisibleDays(newZoomLevel);
             const halfVisibleDays = Math.floor(newVisibleDays / 2);
             const newMinDate = subDays(targetDate, halfVisibleDays);
             const newMaxDate = addDays(targetDate, halfVisibleDays);
 
-            // Update state
             setZoomLevel(newZoomLevel);
             setDynamicMinDate(newMinDate);
             setDynamicMaxDate(newMaxDate);
 
-            // Adjust scroll to center on targetDate
+
             setTimeout(() => {
                 if (containerRef.current) {
                     const newTimelineDates = getTimelineDates(newMinDate, newMaxDate, newZoomLevel, 0, 0);

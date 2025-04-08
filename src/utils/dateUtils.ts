@@ -36,7 +36,7 @@ export function getTimelineDates(
             }
             break;
         case 'week':
-            currentDate = startOfWeek(minDate, { weekStartsOn: 1 }); // Sem padding
+            currentDate = startOfWeek(minDate, { weekStartsOn: 1 });
             endDate = endOfWeek(maxDate, { weekStartsOn: 1 });
             while (currentDate <= endDate) {
                 dates.push(new Date(currentDate));
@@ -44,7 +44,7 @@ export function getTimelineDates(
             }
             break;
         case 'month':
-            currentDate = startOfMonth(minDate); // Sem padding
+            currentDate = startOfMonth(minDate);
             endDate = endOfMonth(maxDate);
             while (currentDate <= endDate) {
                 dates.push(new Date(currentDate));
@@ -78,7 +78,7 @@ export function calculateItemPosition(
     top: number;
 
 } {
-    // Determinar a data de início do grid com base no zoom
+
     let gridStartDate: Date;
     switch (zoomLevel) {
         case 'day':
@@ -94,7 +94,7 @@ export function calculateItemPosition(
 
     let left: number;
     let width: number;
-    const marginSpace = columnWidth * 0.05; // 5% da largura da coluna como margem
+    const marginSpace = columnWidth * 0.05;
 
     switch (zoomLevel) {
         case 'day': {
@@ -122,9 +122,9 @@ export function calculateItemPosition(
         case 'month': {
             const gridStartMonth = startOfMonth(gridStartDate);
             const startMonth = startOfMonth(startDate);
-            const endMonth = startOfMonth(endDate); // Usar o início do mês de endDate para o loop
+            const endMonth = startOfMonth(endDate);
 
-            // Calcular a diferença em meses para a posição inicial
+
             const startMonthDiff = differenceInMonths(startMonth, gridStartMonth);
             const totalDaysInStartMonth = differenceInDays(endOfMonth(startDate), startOfMonth(startDate)) + 1;
             const daysFromStartOfMonth = differenceInDays(startDate, startOfMonth(startDate));
@@ -135,13 +135,13 @@ export function calculateItemPosition(
             let totalWidth = 0;
             let currentMonth = startMonth;
 
-            // Ajustar o loop para incluir o mês de endDate
+
             while (currentMonth <= endMonth) {
                 const monthStart = currentMonth;
                 const monthEnd = endOfMonth(currentMonth);
                 const daysInMonth = differenceInDays(monthEnd, monthStart) + 1;
 
-                // Determinar os dias do item dentro deste mês
+
                 const itemStartInMonth = startDate > monthStart ? startDate : monthStart;
                 const itemEndInMonth = endDate < monthEnd ? endDate : monthEnd;
                 const daysInThisMonth = differenceInDays(itemEndInMonth, itemStartInMonth) + 1;
@@ -152,7 +152,7 @@ export function calculateItemPosition(
                 currentMonth = addMonths(currentMonth, 1);
             }
 
-            width = totalWidth; // Remover marginSpace para teste inicial
+            width = totalWidth;
             break;
         }
     }
@@ -262,7 +262,7 @@ export function getDateAtPosition(
     }
 }
 
-// Função para encontrar índice da data na timeline
+
 export function findDateIndex(date: Date, timelineDates: Date[], zoomLevel: ZoomLevel) {
     switch (zoomLevel) {
         case 'day':

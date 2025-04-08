@@ -1,3 +1,36 @@
+/**
+ * @hook useDragScroll
+ *
+ * @description
+ * Custom hook that implements drag-to-scroll functionality for a scrollable element.
+ * Allows users to click and drag to navigate content horizontally, similar to panning behavior
+ * in maps and other interfaces.
+ *
+ * @param {React.RefObject<HTMLDivElement | null>} containerRef - Reference to the scrollable HTML element
+ *
+ * @returns {Object} Object containing:
+ *   - isDragging: Boolean state indicating whether the user is currently dragging
+ *   - setIsDragging: Function to manually update the dragging state
+ *   - handleMouseDown: Handler for mousedown event that initiates dragging
+ *   - handleMouseMove: Handler for mousemove event that performs scrolling
+ *
+ * @example
+ * // In the component
+ * const containerRef = useRef<HTMLDivElement>(null);
+ * const { isDragging, handleMouseDown, handleMouseMove } = useDragScroll(containerRef);
+ *
+ * return (
+ *   <div
+ *     ref={containerRef}
+ *     onMouseDown={handleMouseDown}
+ *     onMouseMove={handleMouseMove}
+ *     style={{ cursor: isDragging ? 'grabbing' : 'grab', overflow: 'auto' }}
+ *   >
+ *     {/* Scrollable content *\}
+*   </div>
+* );
+*/
+
 import { useState, useEffect, useCallback } from 'react';
 
 export function useDragScroll(containerRef: React.RefObject<HTMLDivElement | null>) {
